@@ -19,7 +19,6 @@ def dixon(N,B=7):
   for j in range(0,len(base)):
     basej2N.append(pow(base[j],2,N))
 
-  i2N = []
   while i < N:
     i2N = pow(i,2,N)
     for k in range(0,len(base)):
