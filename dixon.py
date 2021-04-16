@@ -15,21 +15,19 @@ def dixon(N,B=7):
   start = isqrt(N)
   i = start
 
-  i2N = []
-  while i<=N:
-    i2N.append(pow(i,2,N))
-    i+=1
-
   basej2N = []
   for j in range(0,len(base)):
     basej2N.append(pow(base[j],2,N))
 
-  for i in range(0,len(i2N)):
+  i2N = []
+  while i < N:
+    i2N = pow(i,2,N))
     for k in range(0,len(base)):
-      if i2N[i] == basej2N[k]:
-        f=gcd(start + i - base[k],N)
+      if i2N == basej2N[k]:
+        f=gcd(i - base[k],N)
         if 1 < f < N:
           return f,N//f
+    i+=1
   return -1
 
 print(dixon(int(sys.argv[1])))
