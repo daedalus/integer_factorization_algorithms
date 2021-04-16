@@ -21,7 +21,7 @@ def dixon(N,B=7):
 
   i2N = []
   while i < N:
-    i2N = pow(i,2,N))
+    i2N = pow(i,2,N)
     for k in range(0,len(base)):
       if i2N == basej2N[k]:
         f=gcd(i - base[k],N)
