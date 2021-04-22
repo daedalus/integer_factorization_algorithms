@@ -23,9 +23,11 @@ def multiplicativeOrder(a,n):
 def shor_factor(N,explain=False):
   """ Shor's algorithm recreated in a classical computer """
   """ a ^ P - 1 % N  == 0, where a is random, and p = multOrd(a,N) """
-  n=1
+  n = 1
+  p = q = None
+  dN = N//100
   while True:
-    a = random.randint(2,N-1)
+    a = random.randint(2,dN-1)
     b = gcd(a,N)
     if explain:
       print("Iter: %d" % n)
@@ -41,18 +43,19 @@ def shor_factor(N,explain=False):
         if explain:
           print("pow(%d, %d ,%d) = %d" % (a,r//2,N,ar2)) 
         if (ar2 + 1) % N != 0:
-          x,y = gcd(int(ar2+1),N),gcd(int(ar2-1),N)
+          p,q = gcd(int(ar2+1),N),gcd(int(ar2-1),N)
           #print(x,y)
-          if N > x > 1:
+          if N > p > 1:
             if explain:
-              print("gcd(%d ^ %d - 1, %d) = %d" % (a,r//2,N,x))
-            return int(N//x),int(x)
-          if N > y > 1:
+              print("gcd(%d ^ %d - 1, %d) = %d" % (a,r//2,N,p))
+            q = N//p
+          if N > q > 1:
             if explain:
-              print("gcd(%d ^ %d - 1, %d) = %d" % (a,r//2,N,y))
-            return int(N//y),int(y)
-        else:
-            print("nok")
+              print("gcd(%d ^ %d - 1, %d) = %d" % (a,r//2,N,q))
+            x = N//q
+          if p != None and q != None:
+            assert p*q == N
+            return p,q
     n+=1
 
 def getbits(N):
@@ -77,7 +80,7 @@ if __name__ == "__main__":
   user	0m3.571s
   sys	0m1.054s
   """
-  N=int(sys.argv[1])
-  print("log2(N) = %d, digits(N) = %d" % (getbits(N),len(str(N))))
+  N=Integer(sys.argv[1])
+  print("log2(N) = %d, digits(N) = %d" % (N.nbits(),N.ndigits()))
   p,q=shor_factor(N,explain=True) 
   print("N = %d * %d" % (p,q))     
