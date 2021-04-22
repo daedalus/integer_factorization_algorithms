@@ -25,7 +25,10 @@ def shor_factor(N,explain=False):
   """ Shor's algorithm recreated in a classical computer
   Premise: given a ^ P - 1 % N  == 0, where a is random, and p = multOrd(a,N) we get a factor o N.
   Sage's implementation of multiplicative order first factors the integer (N) in question with PARI.
-  This makes this algorithm only a showcase for studying purposes and not a performant algorithm in any way."""
+  In other words it can be said that the complexity of multiplicativeOrder problem 
+  is equal to the complexity of the factorization problem.
+  This makes this algorithm only a showcase for studying purposes and not an improvement of performance in any way."""
+
   n = 1
   p = q = None
   dN = N//100
