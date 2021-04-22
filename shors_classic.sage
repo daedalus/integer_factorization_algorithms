@@ -21,7 +21,7 @@ def multiplicativeOrder(a,n):
      k += 1
    return -1
 
-def shor_factor(N,explain=False):
+def shor_factor(N,scaler=1,explain=False):
   """ Shor's algorithm recreated in a classical computer
   Premise: given a ^ P - 1 % N  == 0, where a is random, and p = multOrd(a,N) we get a factor o N.
   Sage's implementation of multiplicative order first factors the integer (N) in question with PARI.
@@ -31,7 +31,7 @@ def shor_factor(N,explain=False):
 
   n = 1
   p = q = None
-  dN = N//100
+  dN = N//scaler
   while True:
     a = random.randint(2,dN-1)
     b = gcd(a,N)
@@ -41,7 +41,7 @@ def shor_factor(N,explain=False):
     if 1 < b < N:
       return N//b,b
     else:
-      r = Mod(a,N).multiplicative_order() # Equivalent to quantum part of the algorithm, complexity: O(N).
+      r = Mod(a,dN).multiplicative_order() # Equivalent to quantum part of the algorithm, complexity: O(N).
       if explain:
         print("multOrd(%d, %d) = %d" % (a,N,r))
       if r % 2 == 0:
@@ -80,6 +80,8 @@ if __name__ == "__main__":
   sys	0m1.054s
   """
   N=Integer(sys.argv[1])
+  if len(sys.argv) > 2:
+    scaler = 10**int(sys.argv[2])
   print("log2(N) = %d, digits(N) = %d" % (N.nbits(),N.ndigits()))
   p,q=shor_factor(N,explain=True) 
   print("N = %d * %d" % (p,q))     
