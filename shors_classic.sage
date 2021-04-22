@@ -8,8 +8,9 @@ from gmpy2 import gcd, isqrt,log2
 
 # This function is actualy not being called, its shown just for documenting purposes.
 def multiplicativeOrder(a,n):
-   """ Naive multiplicative_order implementation of orders of magnitude slower than sage's """
-   """ Algo complexity is O(N) """
+   """ Naive multiplicative_order implementation of orders of magnitude slower than sage's
+   Algo complexity is O(N)"""
+   
    if gcd(a,n) > 1:
      return -1
    k = 2
@@ -21,8 +22,10 @@ def multiplicativeOrder(a,n):
    return -1
 
 def shor_factor(N,explain=False):
-  """ Shor's algorithm recreated in a classical computer """
-  """ a ^ P - 1 % N  == 0, where a is random, and p = multOrd(a,N) """
+  """ Shor's algorithm recreated in a classical computer
+  Premise: given a ^ P - 1 % N  == 0, where a is random, and p = multOrd(a,N) we get a factor o N.
+  Sage's implementation of multiplicative order first factors the integer (N) in question with PARI.
+  This makes this algorithm only a showcase for studying purposes and not a performant algorithm in any way."""
   n = 1
   p = q = None
   dN = N//100
