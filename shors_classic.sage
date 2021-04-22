@@ -58,13 +58,6 @@ def shor_factor(N,explain=False):
             return p,q
     n+=1
 
-def getbits(N):
-  n = log2(N)
-  if n % 2 == 0:
-    return n
-  else:
-    return n+1
-
 if __name__ == "__main__":
   """
   time sage shors_classic.sage 6611945602629820434117612619247836840607270940689358040985518679439408007369866558963727598868092310222457775451141333970448929023239
