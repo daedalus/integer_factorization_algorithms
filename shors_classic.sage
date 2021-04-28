@@ -47,7 +47,7 @@ def shor_factor(N,explain=False):
         ar2 = pow(a,(r//2),N) 
         if explain:
           print("pow(%d, %d ,%d) = %d" % (a,r//2,N,ar2)) 
-        if (ar2 + 1) % N != 0:
+        if N-1 > ar2 > 1 and (ar2 + 1) % N != 0:
           p,q = gcd(int(ar2+1),N),gcd(int(ar2-1),N)
           #print(x,y)
           if N > p > 1:
