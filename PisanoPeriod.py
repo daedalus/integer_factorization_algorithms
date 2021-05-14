@@ -7,9 +7,13 @@ White paper: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8901977
 
 import random
 import time
-from gmpy2 import isqrt, gcd, fib2, f_mod as mod
+from gmpy2 import sqrt,isqrt, gcd, fib, fib2, f_mod as mod, powmod, is_prime, get_context
 import sys
 sys.setrecursionlimit(5000)
+
+ctx = get_context()
+ctx.precision += 1000
+sqrt5 = sqrt(5)
 
 class Fibonacci:
     def __init__(self):
@@ -22,21 +26,30 @@ class Fibonacci:
             return (0, 1)
         else:
             a, b = self._fib_res(n >> 1,p)
-            c = ((a % p) * ((b << 1) - a) % p) % p
-            d = (pow(a, 2, p) + pow(b, 2, p)) % p
+            c = mod((mod(a, p) * mod(((b << 1) - a), p)), p)
+            d = mod((powmod(a, 2, p) + powmod(b, 2, p)), p)
             if n & 1 == 0: 
                 return (c, d)
             else:
-                return (d, c + d)
+                return (d, mod((c + d), p))
     
+    def _fib_eig(self,n,p):
+        lambda1 = (1 + sqrt5) / 2
+        lambda2 = (1 - sqrt5) / 2
+        fk = (pow(lambda1, n) - pow(lambda2, n)) / (lambda1 - lambda2)
+        return mod(int(fk), p)
 
-    def get_n_mod_d(self,n,d, use_gmpy=False):
+
+    def get_n_mod_d(self,n,d, use=''):
         if n < 0:
             ValueError("Negative arguments not implemented")
-        if not use_gmpy:
-            return self._fib_res(n,d)[0]
+        if use == 'gmpy':
+            return mod(fib(n), d)
+        elif use == 'eig':
+            return self._fib_eig(n,d) # takes forever
         else:
-            return mod(fib2(n)[0], d)
+            return self._fib_res(n,d)[0]
+
     
     def binary_search(self,L,n):
         """ Finds item index in O(log2(N)) """ 
@@ -80,9 +93,10 @@ class Fibonacci:
             print('search begin:%d,end:%d'%(begin, end))
                 
         rs = [self.get_n_mod_d(x, N) for x in range(search_len)]
-        rs_sort, rs_indices = self.sort_list(rs) 
-             
+        rs_sort, rs_indices = self.sort_list(rs)
+
         if verbose:    
+            print(rs, rs_sort, rs_indices)        
             print('sort complete! time used: %f secs' % (time.time() - starttime))
                 
         T = 0
@@ -101,15 +115,13 @@ class Fibonacci:
                     T = randi - res_n
                      
                     if self.get_n_mod_d(T, N) == 0:
-                        t = time.time() - starttime
-                      
+                        td = int(time.time() - starttime)
                         if verbose:
-                            print('For N = %d Found T:%d, randi: %d, time used %f secs.' % (N , T, t, randi))
-                        return t, T, randi
+                            print('For N = %d Found T:%d, randi: %d, time used %f secs.' % (N , T, randi, td))
+                        return td, T, randi
                     else:
                         if verbose:
                             print('For N = %d\n Found res: %d, inx: %d, res_n: %d , T: %d\n but failed!' % (N, res, inx, res_n, T))
-                        #return None
 
   
     def _trivial_factorization_with_n_t(self, N, T):
@@ -173,17 +185,30 @@ RSA = [71641520761751435455133616475667090434063332228247871795429,
        1522605027922533360535618378132637429718068114961380688657908494580122963258952897654000350692006139]         
 #p1_list = [786766447,16375977287,81465486209,90824225567,862404698273,10452041068841,12697022389549,87996844075109,102010159808071,654472677526847,714033326215093,13051559264369500,13152735237439093,85817923293837151,131912444345458000]
 #p2_list = [673815403,130260073,10937527,15171889,988483,109471,113489,11863,16141,919,631,83,67,13,11,]
-    
-if __name__=='__main__':
-    fib = Fibonacci()
+
+
+def test2():
+  Fib = Fibonacci()
+  a = 5981    
+  for i in range(2,20):
+    f = Fib._fib_res(a,i)
+    print(i,f)
+
+def test(Ns):
+    Fib = Fibonacci()
     times = []
-    for N in (Ns + RSA):
+    for N in Ns:
         print("N: %d" % N)
-        P = fib.factorization(N,2,0)
+        P = Fib.factorization(N,2,0)
         if P != None:
             phi = (P[0]-1) * (P[1]-1)
             print("phi(N): %d" % phi)
             print("factors: %s" % str(P))
-
-
         print('---------------------------------')
+
+if __name__=='__main__':
+   #test2()
+   test(Ns)
+
+
+
