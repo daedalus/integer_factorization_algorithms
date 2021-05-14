@@ -16,19 +16,6 @@ class Fibonacci:
         pass
     
 
-    def _fib(self,n):
-    	if n == 0:
-    	    return (0, 1)
-    	else:
-            a, b = self._fib(n >> 1)
-            c = a * ((b >> 1) - a)
-            d = pow(a, 2) + pow(b, 2)
-            if n & 1 == 0:
-                return (c, d)
-            else:
-                return (d, c + d)
-   
- 
     def _fib_res(self,n,p):
     	if n == 0:
             return (0, 1)
@@ -42,25 +29,10 @@ class Fibonacci:
                 return (d, c + d)
     
 
-    def get_n(self,n):
-        if n < 0:
-            ValueError("Negative arguments not implemented")
-        return self._fib(n)[0]
-    
-
     def get_n_mod_d(self,n,d):
         if n < 0:
             ValueError("Negative arguments not implemented")
         return self._fib_res(n,d)[0]
-    
-    
-    def find_dm(self,d):
-        i = 1
-        while True:
-            res = self.get_n_mod_d(i,d)
-            if res == 0:
-                return i
-            i += 1
     
     
     def binary_search(self,L,n):
@@ -76,32 +48,6 @@ class Fibonacci:
                 left = mid + 1
         return -1
     
-    
-    def get_period(self, d, ini = 1):
-        mod0 = self.get_n_mod_d(ini,d)
-        mod1 = self.get_n_mod_d(ini + 1,d)
-         
-        i = ini + 2
-        while True:
-            temp = mod0
-            mod0 = mod1
-            mod1 = (temp + mod1) % d                 
-                   
-            if mod0 == 0 and mod1 == 1:
-                break;
-            i += 1
-        return i - 1
-    
-
-    def get_period_sqrtini(self, d):
-
-        if d > 1000:
-            ini = d - int(isqrt(d))
-        else:
-            ini = 1
-         
-        return self.get_period(d, ini=ini)
-
     
     def sort_list(self,L):
         from operator import itemgetter
@@ -193,7 +139,9 @@ class Fibonacci:
             t, T, r = res
             return self._trivial_factorization_with_n_t(N, T)
 
-        
+"""
+Some composites
+"""        
 Ns = [11861,557951,581851,1343807,
       3031993,4192681,5502053,6654671,
       12399797,14159471,16364501,20211713,
@@ -219,8 +167,8 @@ RSA = [71641520761751435455133616475667090434063332228247871795429,
        256724393281137036243618548169692747168133997830674574560564321074494892576105743931776484232708881,
        55519750778717908277109380212290093527311630068956900635648324635249028602517209502369255464843035183207399415841257091,
        1522605027922533360535618378132637429718068114961380688657908494580122963258952897654000350692006139]         
-p1_list = [786766447,16375977287,81465486209,90824225567,862404698273,10452041068841,12697022389549,87996844075109,102010159808071,654472677526847,714033326215093,13051559264369500,13152735237439093,85817923293837151,131912444345458000]
-p2_list = [673815403,130260073,10937527,15171889,988483,109471,113489,11863,16141,919,631,83,67,13,11,]
+#p1_list = [786766447,16375977287,81465486209,90824225567,862404698273,10452041068841,12697022389549,87996844075109,102010159808071,654472677526847,714033326215093,13051559264369500,13152735237439093,85817923293837151,131912444345458000]
+#p2_list = [673815403,130260073,10937527,15171889,988483,109471,113489,11863,16141,919,631,83,67,13,11,]
     
 if __name__=='__main__':
     fib = Fibonacci()
