@@ -7,7 +7,7 @@ White paper: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8901977
 
 import random
 import time
-from gmpy2 import isqrt, gcd
+from gmpy2 import isqrt, gcd, fib2, f_mod as mod
 import sys
 sys.setrecursionlimit(5000)
 
@@ -17,9 +17,10 @@ class Fibonacci:
     
 
     def _fib_res(self,n,p):
-    	if n == 0:
+        """ fibonacci sequence nth item modulo p """
+        if n == 0:
             return (0, 1)
-    	else:
+        else:
             a, b = self._fib_res(n >> 1,p)
             c = ((a % p) * ((b << 1) - a) % p) % p
             d = (pow(a, 2, p) + pow(b, 2, p)) % p
@@ -29,13 +30,16 @@ class Fibonacci:
                 return (d, c + d)
     
 
-    def get_n_mod_d(self,n,d):
+    def get_n_mod_d(self,n,d, use_gmpy=False):
         if n < 0:
             ValueError("Negative arguments not implemented")
-        return self._fib_res(n,d)[0]
-    
+        if not use_gmpy:
+            return self._fib_res(n,d)[0]
+        else:
+            return mod(fib2(n)[0], d)
     
     def binary_search(self,L,n):
+        """ Finds item index in O(log2(N)) """ 
         left = 0
         right = len(L) - 1
         while left <= right:
@@ -79,7 +83,7 @@ class Fibonacci:
         rs_sort, rs_indices = self.sort_list(rs) 
              
         if verbose:    
-            print('sort complete! time used:%f secs' % (time.time() - starttime))
+            print('sort complete! time used: %f secs' % (time.time() - starttime))
                 
         T = 0
         has_checked_list = []
