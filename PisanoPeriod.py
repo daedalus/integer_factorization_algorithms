@@ -7,7 +7,7 @@ White paper: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8901977
 
 import random
 import time
-from gmpy2 import sqrt,isqrt, gcd, fib, fib2, f_mod as mod, powmod, is_prime, get_context
+from gmpy2 import sqrt,isqrt, gcd, fib, fib2, f_mod as mod, powmod, is_prime, get_context, log2
 import sys
 sys.setrecursionlimit(5000)
 
@@ -96,7 +96,7 @@ class Fibonacci:
         rs_sort, rs_indices = self.sort_list(rs)
 
         if verbose:    
-            print(rs, rs_sort, rs_indices)        
+            #print(rs, rs_sort, rs_indices)        
             print('sort complete! time used: %f secs' % (time.time() - starttime))
                 
         T = 0
@@ -125,7 +125,7 @@ class Fibonacci:
 
   
     def _trivial_factorization_with_n_t(self, N, T):
-        M = N - T + 1
+        M = abs(N - T) + 1
         d = N
         p1 = []
 
@@ -142,6 +142,19 @@ class Fibonacci:
             iM2p4d = isqrt(M2p4d)
             p1.append((M + iM2p4d) >> 1)
             p1.append((M - iM2p4d) >> 1)
+
+
+        if M2m4d > 0:
+            iM2m4d = isqrt(M2m4d)
+            p1.append((-M + iM2m4d) >> 1)
+            p1.append((-M - iM2m4d) >> 1)
+
+        if M2p4d > 0:
+            iM2p4d = isqrt(M2p4d)
+            p1.append((-M + iM2p4d) >> 1)
+            p1.append((-M - iM2p4d) >> 1)
+
+
 
         for p in p1:
             g = gcd(p,N)
@@ -186,29 +199,24 @@ RSA = [71641520761751435455133616475667090434063332228247871795429,
 #p1_list = [786766447,16375977287,81465486209,90824225567,862404698273,10452041068841,12697022389549,87996844075109,102010159808071,654472677526847,714033326215093,13051559264369500,13152735237439093,85817923293837151,131912444345458000]
 #p2_list = [673815403,130260073,10937527,15171889,988483,109471,113489,11863,16141,919,631,83,67,13,11,]
 
-
-def test2():
-  Fib = Fibonacci()
-  a = 5981    
-  for i in range(2,20):
-    f = Fib._fib_res(a,i)
-    print(i,f)
-
 def test(Ns):
     Fib = Fibonacci()
-    times = []
+    #times = []
+    l = len(Ns)
+    ff = 0
+    ti = time.time()
     for N in Ns:
-        print("N: %d" % N)
+        print("N: %d, log2(N): %d" % (N,log2(N)))
         P = Fib.factorization(N,2,0)
         if P != None:
             phi = (P[0]-1) * (P[1]-1)
             print("phi(N): %d" % phi)
             print("factors: %s" % str(P))
+        td = time.time() - ti
+        print("Runtime: %f\nFully factored:%d of %d" % (td,ff,l))
+        ff += 1
         print('---------------------------------')
 
+
 if __name__=='__main__':
-   #test2()
-   test(Ns)
-
-
-
+   test(Ns+RSA)
