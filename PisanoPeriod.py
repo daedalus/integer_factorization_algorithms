@@ -7,13 +7,15 @@ White paper: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8901977
 
 import random
 import time
-from gmpy2 import sqrt,isqrt, gcd, fib, fib2, f_mod as mod, powmod, is_prime, get_context, log2
+from gmpy2 import sqrt,isqrt, gcd, fib, fib2, f_mod as mod, powmod, is_prime, get_context, log2, log10
 import sys
 sys.setrecursionlimit(5000)
 
 ctx = get_context()
 ctx.precision += 1000
 sqrt5 = sqrt(5)
+
+import bitarray
 
 class Fibonacci:
     def __init__(self):
@@ -40,13 +42,16 @@ class Fibonacci:
         return mod(int(fk), p)
 
 
-    def get_n_mod_d(self,n,d, use=''):
+    def get_n_mod_d(self,n,d, use='mersenne'):
+    #def get_n_mod_d(self,n,d, use=''):
         if n < 0:
             ValueError("Negative arguments not implemented")
         if use == 'gmpy':
             return mod(fib(n), d)
         elif use == 'eig':
             return self._fib_eig(n,d) # takes forever
+        elif use == 'mersenne':
+            return mod(powmod(2,n, d)-1, d)
         else:
             return self._fib_res(n,d)[0]
 
@@ -72,7 +77,7 @@ class Fibonacci:
         return list(L_sorted),list(indices)
    
  
-    def get_period_bigint(self, N, min_accept, xdiff, verbose = False):            
+    def get_period_bigint(self, N, min_accept, xdiff, verbose = False, use_qbf = False):            
         search_len = int(pow(N, (1.0 / 6) / 100))
         
         if search_len < min_accept:
@@ -91,9 +96,16 @@ class Fibonacci:
     
         if verbose:    
             print('search begin:%d,end:%d'%(begin, end))
-                
+               
         rs = [self.get_n_mod_d(x, N) for x in range(search_len)]
         rs_sort, rs_indices = self.sort_list(rs)
+
+        if use_qbf:
+            QBF = bitarray.bitarray(rs_sort[-1]+1) 
+            QBF.setall(0)
+
+            for index in rs_sort:
+                QBF[index] = 1
 
         if verbose:    
             #print(rs, rs_sort, rs_indices)        
@@ -108,7 +120,15 @@ class Fibonacci:
                 has_checked_list.append(randi)
             
                 res = self.get_n_mod_d(randi, N)
-                inx = self.binary_search(rs_sort, res)
+             
+                if use_qbf: 
+                    if res < len(QBF) and QBF[res] == 1:
+                        inx = self.binary_search(rs_sort, res)
+                        print("res:",res,"inx:",inx)
+                    else:
+                        inx = -1
+                else:
+                    inx = self.binary_search(rs_sort, res)
                                     
                 if inx > -1:                
                     res_n = rs_indices[inx]
@@ -154,8 +174,6 @@ class Fibonacci:
             p1.append((-M + iM2p4d) >> 1)
             p1.append((-M - iM2p4d) >> 1)
 
-
-
         for p in p1:
             g = gcd(p,N)
             if N > g > 1:
@@ -171,15 +189,19 @@ class Fibonacci:
 """
 Some composites
 """        
-Ns = [11861,557951,581851,1343807,
+# B1, B2 = 2,0
+Ns0 = [11861,557951,581851,1343807,
       3031993,4192681,5502053,6654671,
       12399797,14159471,16364501,20211713,
-      22828523,44335457,50632823,57635863,
-      384237701921,901500973759,6673435981363,
+      22828523,44335457,50632823,57635863]
+
+# B1,B2 = 10**5, 2
+Ns1 = [384237701921,901500973759,6673435981363,
       11882099612003,15916520600381,17536455849431,
       18960823962761,21554451067267,33241863073423,
-      55076499371497,57744632372831,67165261388497,
-      68072569242511,69684586201261,87756536366813,
+      55076499371497,57744632372831,67165261388497] 
+      
+Ns2 = [68072569242511,69684586201261,87756536366813,
       107458854058613,140967368218669,144086313393859,
       148077481187381,159872954386241,167863367550997,
       173112365219141,199390622342239,235255553137067,
@@ -199,24 +221,67 @@ RSA = [71641520761751435455133616475667090434063332228247871795429,
 #p1_list = [786766447,16375977287,81465486209,90824225567,862404698273,10452041068841,12697022389549,87996844075109,102010159808071,654472677526847,714033326215093,13051559264369500,13152735237439093,85817923293837151,131912444345458000]
 #p2_list = [673815403,130260073,10937527,15171889,988483,109471,113489,11863,16141,919,631,83,67,13,11,]
 
-def test(Ns):
+def test(Ns,B2=0):
     Fib = Fibonacci()
     #times = []
     l = len(Ns)
     ff = 0
-    ti = time.time()
+    n = 1
+    tti = time.time()
     for N in Ns:
-        print("N: %d, log2(N): %d" % (N,log2(N)))
-        P = Fib.factorization(N,2,0)
+        ti = time.time()
+        B1, B2 = pow(10, int((log10(N)) // 2)-1), B2
+        print("Test: %d, N: %d, log2(N): %d, B1: %d, B2: %d" % (n, N,log2(N),B1,B2))
+        P = Fib.factorization(N,B1,B2)
         if P != None:
             phi = (P[0]-1) * (P[1]-1)
             print("phi(N): %d" % phi)
             print("factors: %s" % str(P))
+            ff += 1
         td = time.time() - ti
+        ttd = time.time() - tti
         print("Runtime: %f\nFully factored:%d of %d" % (td,ff,l))
-        ff += 1
-        print('---------------------------------')
+        print("Total Runtime: %f" % (ttd))
+        n += 1
+        print('------------------------------------------------------------------')
+
+
+def test2():
+  Fib = Fibonacci()
+  N = 384237701921
+  B1s = [10**x for x in range(6,3,-1)]
+  B2s = [0,2,4,6,8]
+  n=1
+  tti = time.time()
+  for B1 in B1s:
+      for B2 in B2s:
+          ti = time.time()
+          print("Test: %d, N: %d, log2(N): %d, B1: %d, B2: %d" % (n, N,log2(N),B1,B2))
+          P = Fib.factorization(N,B1,B2)
+          if P != None:
+              phi = (P[0]-1) * (P[1]-1)
+              print("phi(N): %d" % phi)
+              print("factors: %s" % str(P))
+              ff += 1
+          td = time.time() - ti
+          ttd = time.time() - tti
+          print("Runtime: %f\nFully factored:%d of %d" % (td,ff,l))
+          print("Runtime total: %f" % (ttd))
+          n += 1
+
+
+def test3(N, B2 = 0):
+  Fib = Fibonacci()
+  ti = time.time()
+  B1, B2 = pow(10, int((log10(N)) // 2)), B2
+  print("Test: N: %d, log2(N): %d, B1: %d, B2: %d" % (N,log2(N),B1,B2))
+  P = Fib.factorization(N,B1,B2)
+  print(P)
+  td = time.time() - ti
+  print("Runtime: %f" % (td))
 
 
 if __name__=='__main__':
-   test(Ns+RSA)
+   test(Ns0+Ns1+Ns2,B2=int(sys.argv[1]))
+   test2()
+   #test3(int(sys.argv[1]))
