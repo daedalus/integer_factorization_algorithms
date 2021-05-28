@@ -12,7 +12,7 @@ def dixon(N,B=7,explain=False):
   if (start ** 2) == N:
     return start,start
 
-  BA = bitarray.bitarray(pow(B,2,N)+1)
+ 
 
   def primes(B):
     p = 1
@@ -23,21 +23,22 @@ def dixon(N,B=7,explain=False):
     return tmp
 
   base = primes(B)
-
+  lqbf = pow(base[-1],2)+1
+  QBF = bitarray.bitarray(lqbf)
+  
   i = start
 
   basej2N = []
   for j in range(0,len(base)):
     p = pow(base[j],2,N)
     basej2N.append(p)
-    BA[p] = 1
+    QBFp] = 1
 
-  lba = len(BA)
   while i < N:
     i2N = pow(i,2,N)
-    if i2N < lba and BA[i2N] == 1:
+    if i2N < lqbf and QBF[i2N] == 1:
       for k in range(0,len(base)):
-        if BA[basej2N[k]] == 1:
+        if QBF[basej2N[k]] == 1:
           #if i2N == basej2N[k]:
           f=gcd(i - base[k],N)
           if explain:
