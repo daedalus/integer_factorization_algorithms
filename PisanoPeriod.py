@@ -144,47 +144,46 @@ class Fibonacci:
                             print('For N = %d\n Found res: %d, inx: %d, res_n: %d , T: %d\n but failed!' % (N, res, inx, res_n, T))
 
   
-    def _trivial_factorization_with_n_t(self, N, T):
-        M = abs(N - T) + 1
-        d = N
+    def _trivial_factorization_with_n_phi(self, N, phi):
         p1 = []
+        d2 = N << 2
 
-        M2 = pow(M,2)
-        M2p4d = M2 + 4*d
-        M2m4d = M2 - 4*d
+        phi2 = pow(phi,2)
+        phi2p4d = phi2 + d2
+        phi2m4d = phi2 - d2
 
-        if M2m4d > 0:
-            iM2m4d = isqrt(M2m4d)
-            p1.append((M + iM2m4d) >> 1)
-            p1.append((M - iM2m4d) >> 1)
+        if phi2m4d > 0:
+            iphi2m4d = isqrt(phi2m4d)
+            p1.append(phi + iphi2m4d)
+            p1.append(phi - iphi2m4d)
 
-        if M2p4d > 0:
-            iM2p4d = isqrt(M2p4d)
-            p1.append((M + iM2p4d) >> 1)
-            p1.append((M - iM2p4d) >> 1)
+        if phi2p4d > 0:
+            iphi2p4d = isqrt(phi2p4d)
+            p1.append(phi + iphi2p4d)
+            p1.append(phi - iphi2p4d)
 
+        if phi2m4d > 0:
+            iphi2m4d = isqrt(phi2m4d)
+            p1.append(-phi + iphi2m4d)
+            p1.append(-phi - iphi2m4d)
 
-        if M2m4d > 0:
-            iM2m4d = isqrt(M2m4d)
-            p1.append((-M + iM2m4d) >> 1)
-            p1.append((-M - iM2m4d) >> 1)
-
-        if M2p4d > 0:
-            iM2p4d = isqrt(M2p4d)
-            p1.append((-M + iM2p4d) >> 1)
-            p1.append((-M - iM2p4d) >> 1)
+        if phi2p4d > 0:
+            iphi2p4d = isqrt(phi2p4d)
+            p1.append(-phi + iphi2p4d)
+            p1.append(-phi - iphi2p4d)
 
         for p in p1:
-            g = gcd(p,N)
+            g = gcd((p >> 1),N)
             if N > g > 1:
-                return g,N//g
+                return int(g),int(N//g)
    
 
     def factorization(self, N, min_accept, xdiff):
         res = self.get_period_bigint(N, min_accept, xdiff, verbose=True) 
         if res != None:
             t, T, r = res
-            return self._trivial_factorization_with_n_t(N, T)
+            phi = abs(N - T) + 1
+            return self._trivial_factorization_with_n_phi(N, phi)
 
 """
 Some composites
@@ -283,5 +282,5 @@ def test3(N, B2 = 0):
 
 if __name__=='__main__':
    test(Ns0+Ns1+Ns2,B2=int(sys.argv[1]))
-   test2()
+   #test2()
    #test3(int(sys.argv[1]))
