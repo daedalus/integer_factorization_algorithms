@@ -265,12 +265,13 @@ class Poly:
 def rels_find(N, start, stop, P, Rels, required_relations, pol = None):
     """ relations search funcion """
     #print(N,start,stop)
+    sys.stderr.write("rels_find: range(%d, %d), interval: %d sieving start\n" % (start, stop, (stop-start)))
     if (stop-start) < 0:
         return [] 
 
     I = [x for x in range(start, stop) if not is_prime(x) and not is_square(x)]
    
-    D = reduce(lambda x, y: x * y, I)
+    #D = reduce(lambda x, y: x * y, I)
     Diffs = [(pol.eval(x),x) for x in I]
     Found_Rels = []
 
@@ -283,17 +284,16 @@ def rels_find(N, start, stop, P, Rels, required_relations, pol = None):
             break
         yRad, x = Diffs[i]
         y, Rad = yRad
-        r = minifactor2(y, P, D//y)
-        #f = minifactor(y, P)
+        #r = minifactor2(y, P, D//y)
+        f = minifactor(y, P)
         #print(r,trial_division(y,P),y)
-        #if 1:
-        if r != None:
-            f, D = r
+        if 1:
+        #if r != None:
+            #f, D = r
             if f != None and f[1] == 1:
                 Rels.append((f,(y,Rad,A,x)))
-        #if i % 1000 == 0:
-        #    sys.stderr.write("rels_find: range(%d, %d), inverval: %d, found: %d\n" % (start,stop,i,len(Rels)))
-        #    print("STOP is: %s" % STOP)
+        if i % 1000 == 0:
+            sys.stderr.write("rels_find: range(%d, %d), inverval: %d, found: %d\n" % (start,stop,(stop-start),len(Rels)))
     sys.stderr.write("rels_find: range(%d, %d), interval: %d, found: %d with prime_base: %d\n" % (start, stop, (stop-start),len(Rels),len(P)))
      
     #Rels += Found_Rels
@@ -430,7 +430,7 @@ def _MPQS(N, verbose=True, M = 1):
         for poly in polys:
             s1 = min(poly.start_vals[0]) 
             s2 = max(poly.start_vals[0]) 
-            inputs += [(N, start + s1, stop , Prime_base, Rels, required_relations,  poly)]
+            inputs += [(N, start + s1, stop + s1 , Prime_base, Rels, required_relations,  poly)]
 
         # deploy tasks to every cpu core.
         pols = []
