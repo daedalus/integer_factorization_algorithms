@@ -5,12 +5,20 @@
 
 import time
 import sys
-from gmpy2 import gcd, isqrt, is_prime, next_prime, log2, log10, legendre, powmod
+from gmpy2 import gcd, gcdext, isqrt, is_prime, next_prime, log2, log10, legendre, powmod, invert
 from sage.parallel.multiprocessing_sage import parallel_iter
-from multiprocessing import cpu_count, Pool
+from multiprocessing import cpu_count, Pool, Manager
 from itertools import repeat
 import pickle
 
+import threading
+import signal
+
+workpool = None
+
+def terminate_signal():
+    signal.raise_signal(signal.SIGTERM)
+    pass
 
 def mod_sqrt(n, p):
     """ tonelli shanks algorithm """
@@ -173,18 +181,19 @@ class Poly:
     """ Quadratic polynomial helper class """
     def __init__(self, n, P, x_max, search = 0, verbose = None):
         self.n = int(n)
+        self.P = P
         self.x_max = x_max
         self.search = search
         self.verbose = verbose
         self.create()
-
+        self.solve_for_x()
  
     def create(self):
         n = self.n
         x_max = self.x_max
         root_2n = isqrt(2*n)
         root_A = next_prime(isqrt(root_2n // x_max))
-        
+        self.root_A = root_A
         s=0
         while True:
             root_A = next_prime(root_A)
@@ -219,6 +228,30 @@ class Poly:
         return A, B, C
 
 
+    def solve_for_x(self):
+        A = self.A
+        B = self.B
+        C = self.C
+        n = self.n
+        start_vals = []
+        #for p in self.P:
+        p = self.root_A
+        g = 1
+        while g == 1:
+        #for p in self.P:
+            p = next_prime(p)
+            ainv = 1
+            if A != 1:
+                 g, inv, _ = gcdext(A, p)
+            if g != 1:
+                r1 = mod_sqrt(C, p)
+                r2 = (-1 * r1) % p
+                start1 = (ainv * (r1 - B)) % p
+                start2 = (ainv * (r2 - B)) % p
+                start_vals.append([int(start1), int(start2)])
+                self.start_vals = start_vals
+        return start_vals
+
     def eval(self, x):
         A = self.A
         B = self.B
@@ -229,29 +262,43 @@ class Poly:
         
 
 
-def rels_find(N, start, stop, P, pol = None):
+def rels_find(N, start, stop, P, Rels, required_relations, pol = None):
     """ relations search funcion """
-    
+    #print(N,start,stop)
+    if (stop-start) < 0:
+        return [] 
+
     I = [x for x in range(start, stop) if not is_prime(x) and not is_square(x)]
+   
     D = reduce(lambda x, y: x * y, I)
     Diffs = [(pol.eval(x),x) for x in I]
-    Rels = []
+    Found_Rels = []
 
     A = pol.A
     #B = pol.B
     #C = pol.C
 
-    for yRadx in Diffs:
-        yRad, x = yRadx
+    for i in range(len(Diffs)):
+        if len(Rels) > required_relations:
+            break
+        yRad, x = Diffs[i]
         y, Rad = yRad
         r = minifactor2(y, P, D//y)
         #f = minifactor(y, P)
+        #print(r,trial_division(y,P),y)
+        #if 1:
         if r != None:
             f, D = r
             if f != None and f[1] == 1:
                 Rels.append((f,(y,Rad,A,x)))
+        #if i % 1000 == 0:
+        #    sys.stderr.write("rels_find: range(%d, %d), inverval: %d, found: %d\n" % (start,stop,i,len(Rels)))
+        #    print("STOP is: %s" % STOP)
     sys.stderr.write("rels_find: range(%d, %d), interval: %d, found: %d with prime_base: %d\n" % (start, stop, (stop-start),len(Rels),len(P)))
-    return Rels
+     
+    #Rels += Found_Rels
+    
+    return Found_Rels
 
 
 def lin_alg(Rels, P):
@@ -328,6 +375,7 @@ def gen_polys(N, Prime_base, x_max, needed):
 
 def _MPQS(N, verbose=True, M = 1):
     """ main MPQS function """
+    global workpool
     bN, lN = int(log2(N)), len(str(N))
     i2N = isqrt(N) 
     i2Np1 = i2N + 1 
@@ -365,6 +413,9 @@ def _MPQS(N, verbose=True, M = 1):
         sys.stderr.write("Found small factor: %d\n" % early_factor)
         return [early_factor] + _MPQS(N // early_factor)
 
+    manager = Manager()
+    Rels = manager.list()
+
     while True:
         # trim primes, recalc min
         Prime_base = [p for p in Prime_base if p > min_prime]
@@ -377,18 +428,18 @@ def _MPQS(N, verbose=True, M = 1):
         
         # generate tasks parameters
         for poly in polys:
-            #inputs += [(N, start+1+i2N, stop+1+i2N, Prime_base, poly)]
-            inputs += [(N, start, stop, Prime_base, poly)]
+            s1 = min(poly.start_vals[0]) 
+            s2 = max(poly.start_vals[0]) 
+            inputs += [(N, start + s1, stop , Prime_base, Rels, required_relations,  poly)]
 
         # deploy tasks to every cpu core.
         pols = []
-        with Pool(T) as workpool:
-            R = workpool.starmap(rels_find, inputs)   
-            if len(R) > 0:
-                for r in R:
-                    if len(r) > 0:
-                        Rels += r
-
+        workpool = Pool(T)
+        with workpool:
+            R = workpool.starmap(rels_find, inputs)  
+        workpool.close()
+        workpool.join() 
+        
         t2 = time.time()
         sys.stderr.write("Done in: %f secs.\n" % (t2-t1))
         sys.stderr.write("Found %d rels with %d base primes.\n" % (len(Rels),len(Prime_base)))
