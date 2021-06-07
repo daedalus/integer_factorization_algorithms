@@ -306,8 +306,13 @@ def gen_polys(N, Prime_base, x_max, needed):
     cpolys = 0
     polys = []
     polys_ABC = []
+    early_factor = None
     while cpolys <= needed:
         pol = Poly(N, Prime_base, x_max, search=n, verbose=False)
+        if pol.B and pol.C = None:
+            early_factor = pol.A
+            polys = None
+            break
         n += 1
         pol_ABC = (pol.A,pol.B,pol.C)
         if pol_ABC not in polys_ABC:
@@ -316,7 +321,7 @@ def gen_polys(N, Prime_base, x_max, needed):
             polys_ABC.append(pol_ABC)
             polys.append(pol)
             cpolys += 1
-    return polys
+    return polys, early_factor
 
 
 def _MPQS(N, verbose=True, M = 1):
@@ -353,7 +358,10 @@ def _MPQS(N, verbose=True, M = 1):
     start = 0
     stop = B1
 
-    polys = gen_polys(N, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
+    polys, early_factor = gen_polys(N, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
+    if polys == None and early_factor != None:
+        sys.stderr.write("Found small factor: %d\n" % early_factor)
+        return [early_factor] + _MPQS(N // early_factor)
 
     while True:
         # trim primes, recalc min
