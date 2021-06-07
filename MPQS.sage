@@ -393,8 +393,10 @@ def _MPQS(N, verbose=True, M = 1):
             t3 = time.time()
             sys.stderr.write("Done in: %f secs.\n" % (t3-t2))
             sys.stderr.write("Matrix reduction...\n")
-  
             result = proc_basis(N,basis, Rels)
+            t4 = time.time()
+            sys.stderr.write("Done in: %f secs.\n" % (t4-t3))
+            
             if result != None:
                 return result
 
