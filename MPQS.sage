@@ -169,7 +169,34 @@ def minifactor2(x, P, D = 1):
         #del tmp, d                 
         return (tmp2, R, x), D                 
 
-                     
+
+def filter_p(ppws):
+    d = {}
+    for p,pw in ppws:
+        if p not in d:
+            d[p] = pw
+        else:
+            d[p] += pw    
+    #print(d)
+    tmp2 = []
+    for p in d:
+        if d[p] & 1 != 0: # only keep odd powers
+            tmp2.append(p)
+    return tmp2
+
+
+def minifactor3(x, P, smooth_base):
+    smooth = gcd(x, smooth_base)
+    if smooth > 1:
+        not_smooth = x // smooth
+        a1, r1, n1 = trivial_division(smooth, P)
+        a2, r2, n2 = trivial_division(not_smooth, P)
+        if r2 == 1:
+            a = a1 + a2
+            a3 = filter_p(a)
+            return a3, r2, x
+        
+                         
 def minifactor(x, P):
     """ minifactor algo, finds odd-power primes in composites """
     p = trial_division_minus_even_powers(x,P)
