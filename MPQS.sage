@@ -192,7 +192,8 @@ class Poly:
                 if s > self.search:
                     break
             elif leg == 0:
-                self.A = root_A
+                self.early_factor = root_A
+                self.A = None
                 self.B = None
                 self.C = None
                 return root_A, None, None
@@ -309,8 +310,8 @@ def gen_polys(N, Prime_base, x_max, needed):
     early_factor = None
     while cpolys <= needed:
         pol = Poly(N, Prime_base, x_max, search=n, verbose=False)
-        if pol.B and pol.C = None:
-            early_factor = pol.A
+        if pol.A == None and pol.B == None and pol.C == None:
+            early_factor = pol.early_factor
             polys = None
             break
         n += 1
