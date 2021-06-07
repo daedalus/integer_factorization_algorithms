@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Multiple polynomial Quadratic sieve
 # Author Dario Clavijo 2021
 # License: GPLv3
 
