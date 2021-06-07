@@ -257,35 +257,8 @@ def lin_alg(Rels, P):
     M = matrix(GF(2), len(Rels), len(P), lambda i, j:P[j] in Rels[i][0][0])
     return M.left_kernel().basis()
 
-  
-def proc_basis_0(N, basis, Rels, pols = None):
-    for K in basis:
-        I = [f for f, k in zip(Rels, K) if k == 1]
-        x = product([int(isqrt(f[2] + N)) for f in I])
-        y = isqrt(product([f[2] for f in I]))
-        g0, g1 = gcd(N, x - y),gcd(N, x + y)
-        if N > g0 > 1:
-            return g0, N // g0
-        if N > g1 > 1:
-            return [g1, N // g1]
 
-
-def writepkl(N,basis,Rels,pols):
-    obj = {}
-    obj['N'] = N
-    obj['pols'] = pols
-    obj['rels'] = Rels
-    obj['basis'] = basis
-    fname = "/tmp/QS_%d.pkl" % N
-    sys.stderr.write("saving work to: %s\n" % fname)
-    pickle.dump(obj,open(fname,"wb"))
-
-
-def readpkl(fname):
-    return pickle.load(open(fname,"rb"))
-
-
-def proc_basis(N, basis, Rels, pols = None):
+def proc_basis(N, basis, Rels):
     """ process each basis vector """
     for K in basis:
         lhs = rhs = Ahs = 1
@@ -301,7 +274,7 @@ def proc_basis(N, basis, Rels, pols = None):
                 return [int(g), int(N//g)]
 
 
-def findp(n, bound):
+def find_primebase(n, bound):
     """ finds the base prime for given n and bound """
     primes, mod_root, log_p, num_prime, p = [], [], [], 0, 3
     while p < bound or num_prime < 3:
@@ -327,7 +300,7 @@ def recalc_min_prime_thresh(thresh, Prime_base, log_p):
     return min_prime, thresh, fudge
 
 
-def genpolys(N, Prime_base, x_max, needed):
+def gen_polys(N, Prime_base, x_max, needed):
     """ It searchs for distinct needed polys congruent to n."""
     n=1
     cpolys = 0
@@ -357,7 +330,7 @@ def _MPQS(N, verbose=True, M = 1):
     T = cpu_count()
 
     B1 = pow(int(log10(pow(N, 6))),2) 
-    Prime_base, log_p = findp(N, B1)
+    Prime_base, log_p = find_primebase(N, B1)
     B1 //= M
     B2 = len(Prime_base)
   
@@ -380,7 +353,7 @@ def _MPQS(N, verbose=True, M = 1):
     start = 0
     stop = B1
 
-    polys = genpolys(N, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
+    polys = gen_polys(N, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
 
     while True:
         # trim primes, recalc min
@@ -391,11 +364,13 @@ def _MPQS(N, verbose=True, M = 1):
         sys.stderr.write("Data collection with %d threads...\n" % T)
 
         inputs = []
-         
+        
+        # generate tasks parameters
         for poly in polys:
             #inputs += [(N, start+1+i2N, stop+1+i2N, Prime_base, poly)]
             inputs += [(N, start, stop, Prime_base, poly)]
 
+        # deploy tasks to every cpu core.
         pols = []
         with Pool(T) as workpool:
             R = workpool.starmap(rels_find, inputs)   
@@ -408,6 +383,7 @@ def _MPQS(N, verbose=True, M = 1):
         sys.stderr.write("Done in: %f secs.\n" % (t2-t1))
         sys.stderr.write("Found %d rels with %d base primes.\n" % (len(Rels),len(Prime_base)))
 
+        # when needed relations is reached proceed to do linear algebra
         if len(Rels) > required_relations:
             sys.stderr.write("Found %d enough relations of %d needed relations...\n" % (len(Rels),required_relations))
             sys.stderr.write("Matrix creation...")
@@ -418,7 +394,7 @@ def _MPQS(N, verbose=True, M = 1):
             sys.stderr.write("Done in: %f secs.\n" % (t3-t2))
             sys.stderr.write("Matrix reduction...\n")
   
-            result = proc_basis(N,basis, Rels, pols=pols)
+            result = proc_basis(N,basis, Rels)
             if result != None:
                 return result
 
