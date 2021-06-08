@@ -430,7 +430,7 @@ def process_basis_vectors(N, basis, Rels, multiplier = 1):
                 factors = [int(g), int(N//g)]
                 if multiplier > 1:
                     tmp2 = []
-                    for factor in factors
+                    for factor in factors:
                         ignoreme  = gcd(factor,multiplier)
                         if r > ignoreme > 1:
                             tmp2.append(factor//ignoreme)
@@ -539,14 +539,14 @@ def _MPQS(N, verbose=True, M = 1):
     polys, early_factors = generate_polys(Nm, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
     if (early_factors) > 0:
         tmp = 1
-        small = []
+         small = []
         for early_factor in early_factors:
             g = gcd(early_factor, N)    
             if N > g > 1: 
                 tmp *= g
                 small.append(g)
-         if tmp > 1:
-             return small + MPQS(N // tmp)
+        if tmp > 1:
+            return small + MPQS(N // tmp)
     
     manager = Manager()
     Rels = manager.list() # placeholder list for relations shareable between child processes.
