@@ -539,12 +539,14 @@ def _MPQS(N, verbose=True, M = 1):
     polys, early_factors = generate_polys(Nm, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
     if (early_factors) > 0:
         tmp = 1
+        small = []
         for early_factor in early_factors:
             g = gcd(early_factor, N)    
             if N > g > 1: 
                 tmp *= g
+                small.append(g)
          if tmp > 1:
-             return [tmp, N // tmp]
+             return small + MPQS(N // tmp)
     
     manager = Manager()
     Rels = manager.list() # placeholder list for relations shareable between child processes.
