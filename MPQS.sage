@@ -139,8 +139,9 @@ def minifactor2(x, P, D = 1):
 
 def minifactor3(x, P, smooth_base):
     """ minifactor """
+    x = abs(x)
     smooth = gcd(x, smooth_base)
-    if x > smooth > 1:
+    if smooth > 1:
         not_smooth = x // smooth
         a1, r1, n1 = trial_division(smooth, P)
         a2, r2, n2 = trial_division(not_smooth, P)
@@ -158,7 +159,8 @@ def minifactor(x, P):
 
 
 class Poly:
-    """ Quadratic polynomial helper class """
+    """ Quadratic polynomial helper class: 
+    type Ax + 2Bx + C """
     def __init__(self, n, P, x_max, search = 0, verbose = None):
         self.n = int(n)
         self.P = P
@@ -242,10 +244,10 @@ class Poly:
         
 
 
-def rels_find(N, start, stop, P, smooth_base, Rels, required_relations, pol = None):
+def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol = None):
     """ relations search funcion """
     #print(N,start,stop)
-    sys.stderr.write("rels_find: range(%d, %d), interval: %d sieving start\n" % (start, stop, (stop-start)))
+    sys.stderr.write("relations_find: range(%d, %d), interval: %d sieving start\n" % (start, stop, (stop-start)))
     if (stop-start) < 0:
         return [] 
 
@@ -262,6 +264,7 @@ def rels_find(N, start, stop, P, smooth_base, Rels, required_relations, pol = No
     ltd = time.time()
     ld = len(Diffs)
     m = 1000
+    msg = ""
     for i in range(ld):
         if len(Rels) > required_relations:
             break
@@ -284,21 +287,22 @@ def rels_find(N, start, stop, P, smooth_base, Rels, required_relations, pol = No
             eta = td * (ld/m)
             tds = humanfriendly.format_timespan(td)
             etas = humanfriendly.format_timespan(eta)
-            sys.stderr.write("rels_find: range(%d, %d), inverval: %d of %d, found: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),len(Rels),tds,etas))
-    sys.stderr.write("rels_find: range(%d, %d, %d), interval: %d of %d, found: %d with prime_base: %d\n" % (start, stop,i, (stop-start),len(Rels),len(P)))
+            msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),len(Rels),required_relations,tds,etas)
+            sys.stderr.write(msg)
+    sys.stderr.write(msg)
      
     #Rels += Found_Rels
     
     return Found_Rels
 
 
-def lin_alg(Rels, P):
+def linear_algebra(Rels, P):
     """ linear algebra, it generates a matrix in GF(2) then computes it's null-space"""
     M = matrix(GF(2), len(Rels), len(P), lambda i, j:P[j] in Rels[i][0][0])
     return M.left_kernel().basis()
 
 
-def proc_basis(N, basis, Rels):
+def process_basis_vectors(N, basis, Rels):
     """ process each basis vector """
     for K in basis:
         lhs = rhs = Ahs = 1
@@ -330,7 +334,7 @@ def find_primebase(n, bound):
     return primes, log_p
 
 
-def recalc_min_prime_thresh(thresh, Prime_base, log_p):
+def recalculate_min_prime_thresh(thresh, Prime_base, log_p):
     """ recalculates the min efective prime base bound """
     min_prime = int(thresh * 3)
     fudge = sum(log_p[i] for i, p in enumerate(Prime_base) if p < min_prime)
@@ -340,7 +344,7 @@ def recalc_min_prime_thresh(thresh, Prime_base, log_p):
     return min_prime, thresh, fudge
 
 
-def gen_polys(N, Prime_base, x_max, needed):
+def generate_polys(N, Prime_base, x_max, needed):
     """ It searchs for distinct needed polys congruent to n."""
     n=1
     cpolys = 0
@@ -398,7 +402,7 @@ def _MPQS(N, verbose=True, M = 1):
     start = 0
     stop = B1
 
-    polys, early_factor = gen_polys(N, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
+    polys, early_factor = generate_polys(N, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
     if polys == None and early_factor != None:
         sys.stderr.write("Found small factor: %d\n" % early_factor)
         return [early_factor] + _MPQS(N // early_factor)
@@ -410,7 +414,7 @@ def _MPQS(N, verbose=True, M = 1):
         # trim primes, recalc min
         Prime_base = [p for p in Prime_base if p > min_prime]
         smooth_base = prod(Prime_base)
-        min_prime, thresh, fudge = recalc_min_prime_thresh(thresh, Prime_base, log_p)
+        min_prime, thresh, fudge = recalculate_min_prime_thresh(thresh, Prime_base, log_p)
 
         t1 = time.time()
         sys.stderr.write("Data collection with %d threads...\n" % T)
@@ -427,7 +431,7 @@ def _MPQS(N, verbose=True, M = 1):
         pols = []
         workpool = Pool(T)
         with workpool:
-            R = workpool.starmap(rels_find, inputs)  
+            R = workpool.starmap(relations_find, inputs)  
         workpool.close()
         workpool.join() 
         
@@ -440,12 +444,12 @@ def _MPQS(N, verbose=True, M = 1):
             sys.stderr.write("Found %d enough relations of %d needed relations...\n" % (len(Rels),required_relations))
             sys.stderr.write("Matrix creation...")
             
-            basis = lin_alg(Rels, Prime_base)
+            basis = linear_algebra(Rels, Prime_base)
 
             t3 = time.time()
             sys.stderr.write("Done in: %f secs.\n" % (t3-t2))
             sys.stderr.write("Matrix reduction...\n")
-            result = proc_basis(N,basis, Rels)
+            result = process_basis_vectors(N,basis, Rels)
             t4 = time.time()
             sys.stderr.write("Done in: %f secs.\n" % (t4-t3))
             
