@@ -433,6 +433,40 @@ def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol
     #Rels += Found_Rels
     return Found_Rels
 
+def transpose(A):
+    """
+    Transpose matrix so columns become rows
+    """
+    new_A = []
+    for i in range(len(A[0])):
+        new_row = []
+        for row in A:
+            new_row.append(row[i])
+        new_A.append(new_row)
+    return(new_A)
+
+def Gaussian_elimination_GF2(A):
+  h = len(A)
+  m = len(A[0])
+  marks = [False] * h
+  for j in range(0,m):
+    for i in range(0,h):
+      if A[i][j] == 1:
+          marks[i] = True
+          for k in range(j+1,m):
+            if A[i][k] == 1:
+              A[i][k] = (A[i][j] ^ A[i][k]) 
+          break
+  return marks, A
+
+def left_nullspace(A):
+    """
+    Compute left null space:
+    x such that xTA = 0T
+    """
+    A = transpose(A)
+    marks, A = Gaussian_elimination_GF2(A)
+    return marks, A
 
 def linear_algebra(Rels, P):
     """ 
@@ -473,7 +507,7 @@ def find_primebase(n, bound):
     """ 
     Finds the base prime for given n and bound. 
     https://github.com/elliptic-shiho/primefac-fork/blob/master/_primefac/_factor_algo/_mpqs.py
-    
+    Same as the sieve of erathostenes.
     """
     primes, mod_root, log_p, num_prime, p = [], [], [], 0, 3
     while p < bound or num_prime < 3:
