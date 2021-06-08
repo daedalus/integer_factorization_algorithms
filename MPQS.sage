@@ -268,6 +268,7 @@ class Poly:
         self.x_max = x_max
         self.search = search
         self.verbose = verbose
+        self.early_factors = []
         self.create()
         self.solve_for_x()
  
@@ -283,18 +284,15 @@ class Poly:
         root_A = next_prime(isqrt(root_2n // x_max))
         self.root_A = root_A
         s=0
-        while True:
+        leg = 2
+        while leg != 1:
             root_A = next_prime(root_A)
             leg = legendre(n, root_A)
             if leg == 1:
                 if s > self.search:
                     break
             elif leg == 0:
-                self.early_factor = root_A
-                self.A = None
-                self.B = None
-                self.C = None
-                return root_A, None, None
+                self.early_factors.append(root_A)
             s+=1
 
         self.s = s
@@ -481,22 +479,23 @@ def generate_polys(N, Prime_base, x_max, needed):
     cpolys = 0
     polys = []
     polys_ABC = []
-    early_factor = None
+    early_factors = []
     while cpolys <= needed:
         pol = Poly(N, Prime_base, x_max, search=n, verbose=False)
-        if pol.A == None and pol.B == None and pol.C == None:
-            early_factor = pol.early_factor
-            polys = None
-            break
+        if len(pol.early_factors) > 0:
+            for early_factor in pol.early_factors:
+                if early_factor not in early_factors:
+                    early_factors.append(early_factor)
+        else:
+            pol_ABC = (pol.A,pol.B,pol.C)
+            if pol_ABC not in polys_ABC:
+                m = "Found poly: f(x) = %dx^2 + %dx + %d\n" % (pol_ABC)
+                sys.stderr.write(m.replace("+ -","- "))
+                polys_ABC.append(pol_ABC)
+                polys.append(pol)
+                cpolys += 1
         n += 1
-        pol_ABC = (pol.A,pol.B,pol.C)
-        if pol_ABC not in polys_ABC:
-            m = "Found poly: f(x) = %dx^2 + %dx + %d\n" % (pol_ABC)
-            sys.stderr.write(m.replace("+ -","- "))
-            polys_ABC.append(pol_ABC)
-            polys.append(pol)
-            cpolys += 1
-    return polys, early_factor
+    return polys, early_factors
 
 
 def _MPQS(N, verbose=True, M = 1):
@@ -537,12 +536,16 @@ def _MPQS(N, verbose=True, M = 1):
     start = 0
     stop = B1 # range to sieve
 
-    polys, early_factor = generate_polys(Nm, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
-    if polys == None and early_factor != None:
-        if multiplier > 1 and gcd(early_factor, multiplier) == 1:
-            sys.stderr.write("Found small factor: %d\n" % early_factor)
-            return [early_factor] + _MPQS(N // early_factor)
-
+    polys, early_factors = generate_polys(Nm, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
+    if (early_factors) > 0:
+        tmp = 1
+        for early_factor in early_factors:
+            g = gcd(early_factor, N)    
+            if N > g > 1: 
+                tmp *= g
+         if tmp > 1:
+             return [tmp, N // tmp]
+    
     manager = Manager()
     Rels = manager.list() # placeholder list for relations shareable between child processes.
 
