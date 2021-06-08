@@ -168,6 +168,17 @@ def trial_division(n, P):
             i += 1
     return a,r,n
 
+def merge_powers(ppws):
+    d = {}
+    for p,pw in ppws:
+        if p not in d:
+            d[p] = pw
+        else:
+            d[p] += pw
+    tmp2 = []
+    for p in d:
+       tmp2.append((p,d[p]))
+    return tmp2
 
 def filter_out_even_powers(ppws):
     """ 
@@ -265,6 +276,23 @@ def minifactor3(x, P, smooth_base):
             a = a1 + a2
             a3 = filter_out_even_powers(a)
             return a3, r2, x
+
+
+def minifactor4(x, P, smooth_base):
+    """ 
+    Minifactor. 
+    """
+    x = abs(x)
+    a1 = []
+    smooth = gcd(x, smooth_base)
+    if smooth > 1:
+        not_smooth = x // smooth
+        a1, r1, n1 = trial_division(smooth, P)
+        a2, r2, n2 = trial_division(not_smooth, P)
+    else:
+        a2, r2, n2 = trial_division(x, P) 
+    return merge_powers(a1 + a2), r2, x
+
         
                          
 def minifactor(x, P):
@@ -404,21 +432,26 @@ def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol
     ld = len(Diffs)
     m = 1000
     msg = ""
+    partials = {}
+    merged = 0
     for i in range(ld):
         if len(Rels) > required_relations:
             break
         yRad, x = Diffs[i]
         y, Rad = yRad
-        #r = minifactor2(y, P, D//y)
-        #f = minifactor(y, P)
-        f = minifactor3(y, P, smooth_base)
-        #print(r,trial_division(y,P),y)
+        f = minifactor4(y, P, smooth_base)
         if 1:
-        #if r != None:
-            #f, D = r
-            if f != None and f[1] == 1:
-                Rels.append((f,(y,Rad,A,x)))
-
+            if f != None:
+                filtered = (filter_out_even_powers(f[0]),f[1],y)
+                if f[1] == 1:    
+                    Rels.append([f[0], y, Rad, A])
+                elif f[1] in partials:
+                    a = partials[f[1]]
+                    p = filter_out_even_powers(f[0] + a[0])
+                    Rels.append([p, y * a[1], Rad * a[2], A* a[3]])
+                    merged += 1
+                else:
+                    partials[f[1]] = [f[0], y, Rad, A]
         if i % m == 0:
             lt = time.time()
             td = lt - ltd
@@ -426,10 +459,12 @@ def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol
             eta = td * (ld/m)
             tds = humanfriendly.format_timespan(td)
             etas = humanfriendly.format_timespan(eta)
-            msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),len(Rels),required_relations,tds,etas)
+            msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),len(Rels),required_relations, merged,tds,etas)
             sys.stderr.write(msg)
+    
+    msg = "relations_find: Ended range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d\n" % (start,stop,i,(stop-start),len(Rels),required_relations, merged)
     sys.stderr.write(msg)
-     
+    
     #Rels += Found_Rels
     return Found_Rels
 
@@ -476,7 +511,7 @@ def linear_algebra(Rels, P):
     """ 
     Linear algebra, it generates a matrix in GF(2) then computes it's left null-space. 
     """
-    M = matrix(GF(2), len(Rels), len(P), lambda i, j:P[j] in Rels[i][0][0])
+    M = matrix(GF(2), len(Rels), len(P), lambda i, j:P[j] in Rels[i][0])
     return M.left_kernel().basis()
 
 
@@ -489,11 +524,11 @@ def process_basis_vectors(N, basis, Rels, multiplier = 1):
         I = [f for f, k in zip(Rels, K) if k == 1]
         if len(I) > 0:
             for i in I:
-                lhs *= i[1][0] # left-hand side
-                rhs *= i[1][1] # rigth-hand side
-                Ahs *= i[1][2] # A-term in poly
+                lhs *= i[1] # left-hand side
+                rhs *= i[2] # rigth-hand side
+                Ahs *= i[3] # A-term in poly
             LHS = Ahs * lhs
-            g = gcd(isqrt(LHS)-rhs,N)
+            g = gcd(isqrt(abs(LHS))-rhs,N)
             if N > g > 1:     
                 factors = [int(g), int(N//g)]
                 if multiplier > 1:
