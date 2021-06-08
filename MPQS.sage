@@ -3,6 +3,16 @@
 # Author Dario Clavijo 2021
 # License: GPLv3
 
+"""
+The quadratic sieve algorithm (QS) is an integer factorization algorithm and, in practice, 
+the second fastest method known (after the general number field sieve). 
+It is still the fastest for integers under 100 decimal digits or so, and is considerably simpler than the number field sieve. 
+It is a general-purpose factorization algorithm, meaning that its running time depends solely on the size of the integer to be factored,
+and not on special structure or properties. 
+It was invented by Carl Pomerance in 1981 as an improvement to Schroeppel's linear sieve
+https://en.wikipedia.org/wiki/Quadratic_sieve
+"""
+
 import time
 import sys
 from gmpy2 import gcd, gcdext, isqrt, is_prime, next_prime, log2, log10, legendre, powmod, invert
@@ -16,23 +26,18 @@ def choose_multiplier(n, prime_list):
     """
     Code borrowed from msieve/mpqs.c
     """
-    mult_list = [1, 2, 3, 5, 6, 7, 10, 11, 13, 14, 15, 17, 19, 21, 22, 23, 26, 29, 30, 31, 33, 34, 35, 37, 38,39, 41, 42, 43, 46, 47, 51, 53, 55, 57, 58, 59, 61, 62, 65, 66, 67, 69, 70, 71, 73]
-    #mult_list = [1] + prime_list
-    #fb_size = len(P)
+    mult_list = [1, 2, 3, 5, 6, 7, 10, 11, 13, 14, 15, 17, 19, 21, 22, 23, 26, 29, 30, 31, 33, 34, 35, 37, 38]
+    mult_list += [39, 41, 42, 43, 46, 47, 51, 53, 55, 57, 58, 59, 61, 62, 65, 66, 67, 69, 70, 71, 73]
+
     MAX_MP_WORDS = 30
     NUM_MULTIPLIERS=len(mult_list)
     NUM_TEST_PRIMES = 300
-
     i =  j = 0
-    #num_primes = min(2 * fb_size, NUM_TEST_PRIMES);
     best_score = 0.0
     best_mult = 0
     scores = [0.0] * NUM_MULTIPLIERS
     num_multipliers = 0
-    #log2n = log(n)
     M_LN2 = log(2)
-
-    #num_primes = min(num_primes, len(prime_list))
     num_primes = len(prime_list)
 
     """ measure the contribution of 2 as a factor of sieve
@@ -48,9 +53,6 @@ def choose_multiplier(n, prime_list):
         logmult = log(curr_mult)
         # only consider multipliers k such than
         #   k*n will not overflow an mp_t */
-
-        #if (log2n + logmult > (32 * MAX_MP_WORDS - 2) * M_LN2)
-        #    break;
 
         scores[i] = 0.5 * logmult;
         if knmod8 == 1:
