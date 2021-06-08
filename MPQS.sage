@@ -12,6 +12,106 @@ from itertools import repeat
 import humanfriendly
 
 
+def choose_multiplier(n, prime_list):
+    """
+    Code borrowed from msieve/mpqs.c
+    """
+    mult_list = [1, 2, 3, 5, 6, 7, 10, 11, 13, 14, 15, 17, 19, 21, 22, 23, 26, 29, 30, 31, 33, 34, 35, 37, 38,39, 41, 42, 43, 46, 47, 51, 53, 55, 57, 58, 59, 61, 62, 65, 66, 67, 69, 70, 71, 73]
+    #mult_list = [1] + prime_list
+    #fb_size = len(P)
+    MAX_MP_WORDS = 30
+    NUM_MULTIPLIERS=len(mult_list)
+    NUM_TEST_PRIMES = 300
+
+    i =  j = 0
+    #num_primes = min(2 * fb_size, NUM_TEST_PRIMES);
+    best_score = 0.0
+    best_mult = 0
+    scores = [0.0] * NUM_MULTIPLIERS
+    num_multipliers = 0
+    #log2n = log(n)
+    M_LN2 = log(2)
+
+    #num_primes = min(num_primes, len(prime_list))
+    num_primes = len(prime_list)
+
+    """ measure the contribution of 2 as a factor of sieve
+       values. The multiplier itself must also be taken into
+       account in the score. scores[i] is the correction that
+       is implicitly applied to the size of sieve values for
+       multiplier i; a negative score makes sieve values 
+       smaller, and so is better """
+
+    for i in range(0, NUM_MULTIPLIERS): 
+        curr_mult = mult_list[i]
+        knmod8 = (curr_mult * n) % 8
+        logmult = log(curr_mult)
+        # only consider multipliers k such than
+        #   k*n will not overflow an mp_t */
+
+        #if (log2n + logmult > (32 * MAX_MP_WORDS - 2) * M_LN2)
+        #    break;
+
+        scores[i] = 0.5 * logmult;
+        if knmod8 == 1:
+            scores[i] -= 2 * M_LN2;
+            break
+        if knmod8 == 5:
+            scores[i] -= M_LN2;
+            break;
+        if knmod8 == 3 or knmod8 == 7:
+            scores[i] -= 0.5 * M_LN2;
+            break;
+        # even multipliers start with a handicap
+    num_multipliers = i;
+
+    # for the rest of the small factor base primes 
+
+    for i in range (1, num_primes):
+        prime = prime_list[i]
+        contrib = log(prime) / (prime - 1);
+        modp = n % prime
+
+        for j in range(0, num_multipliers):
+            curr_mult = mult_list[j];
+            knmodp = (curr_mult * modp) % prime
+            # if prime i is actually in the factor base
+            #   for k * n ... */
+            if (knmodp == 0 or legendre(knmodp, prime) == 1):
+
+                """ ...add its contribution. A prime p con-
+                   tributes log(p) to 1 in p sieve values, plus
+                   log(p) to 1 in p^2 sieve values, etc. The
+                   average contribution of all multiples of p 
+                   to a random sieve value is thus
+                   log(p) * (1/p + 1/p^2 + 1/p^3 + ...)
+                   = (log(p) / p) * 1 / (1 - (1/p)) 
+                   = log(p) / (p-1)
+                   This contribution occurs once for each
+                   square root used for sieving. There are two
+                   roots for each factor base prime, unless
+                   the prime divides k*n. In that case there 
+                   is only one root """
+
+                if (knmodp == 0):
+                    scores[j] -= contrib
+                else:
+                    scores[j] -= 2 * contrib
+
+    # use the multiplier that generates the best score 
+
+    best_score = 1000.0
+    best_mult = 1
+
+    #print(scores)
+   
+    for i in range(0, num_multipliers):
+        score = scores[i];
+        if (score < best_score):
+            best_score = score
+            best_mult = mult_list[i]
+    return best_mult;
+
 def mod_sqrt(n, p):
     """ Tonelli shanks algorithm """
     a = n % p
@@ -308,7 +408,7 @@ def linear_algebra(Rels, P):
     return M.left_kernel().basis()
 
 
-def process_basis_vectors(N, basis, Rels):
+def process_basis_vectors(N, basis, Rels, multiplier = 1):
     """ Process each basis vector, construct (a^2)-(b^2) mod n congruence. """
     for K in basis:
         lhs = rhs = Ahs = 1
@@ -320,8 +420,17 @@ def process_basis_vectors(N, basis, Rels):
                 Ahs *= i[1][2] # A-term in poly
             LHS = Ahs * lhs
             g = gcd(isqrt(LHS)-rhs,N)
-            if N > g > 1:
-                return [int(g), int(N//g)]
+            if N > g > 1:     
+                factors = [int(g), int(N//g)]
+                if multiplier > 1:
+                    tmp2 = []
+                    for factor in factors
+                        ignoreme  = gcd(factor,multiplier)
+                        if r > ignoreme > 1:
+                            tmp2.append(factor//ignoreme)
+                    return tmp2
+                else:
+                    return tmp
 
 
 def find_primebase(n, bound):
@@ -393,6 +502,11 @@ def _MPQS(N, verbose=True, M = 1):
         sys.stderr.write("Found small factor: %d\n" % Prime_base[0])
         return Prime_base + _MPQS(N // Prime_base[0])
 
+    multiplier = choose_multiplier(N, Prime_base)
+    Nm = multiplier * N
+    
+    sys.stderr.write("Multiplier is: %d" % multiplier)
+
     x_max = B2 *60  # size of the sieve
     m_val = (x_max * root_2n) >> 1
     thresh = log10(m_val) * 0.735
@@ -407,10 +521,11 @@ def _MPQS(N, verbose=True, M = 1):
     start = 0
     stop = B1 # range to sieve
 
-    polys, early_factor = generate_polys(N, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
+    polys, early_factor = generate_polys(Nm, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
     if polys == None and early_factor != None:
-        sys.stderr.write("Found small factor: %d\n" % early_factor)
-        return [early_factor] + _MPQS(N // early_factor)
+        if multiplier > 1 and gcd(early_factor, multiplier) == 1:
+            sys.stderr.write("Found small factor: %d\n" % early_factor)
+            return [early_factor] + _MPQS(N // early_factor)
 
     manager = Manager()
     Rels = manager.list() # placeholder list for relations shareable between child processes.
@@ -430,7 +545,7 @@ def _MPQS(N, verbose=True, M = 1):
         for poly in polys:
             s1 = min(poly.start_vals[0]) 
             s2 = max(poly.start_vals[0]) 
-            inputs += [(N, start + s1, stop + s2 , Prime_base, smooth_base, Rels, required_relations,  poly)]
+            inputs += [(Nm, start + s1, stop + s2 , Prime_base, smooth_base, Rels, required_relations,  poly)]
 
         # deploy tasks to every cpu core.
         pols = []
@@ -454,7 +569,7 @@ def _MPQS(N, verbose=True, M = 1):
             t3 = time.time()
             sys.stderr.write("Done in: %f secs.\n" % (t3-t2))
             sys.stderr.write("Matrix reduction...\n")
-            result = process_basis_vectors(N,basis, Rels)
+            result = process_basis_vectors(Nm, basis, Rels, multiplier)
             t4 = time.time()
             sys.stderr.write("Done in: %f secs.\n" % (t4-t3))
             
