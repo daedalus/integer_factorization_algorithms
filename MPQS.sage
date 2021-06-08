@@ -11,8 +11,9 @@ from multiprocessing import cpu_count, Pool, Manager
 from itertools import repeat
 import humanfriendly
 
+
 def mod_sqrt(n, p):
-    """ tonelli shanks algorithm """
+    """ Tonelli shanks algorithm """
     a = n % p
     if p % 4 == 3:
         return pow(a, (p+1) >> 2, p)
@@ -46,6 +47,7 @@ def mod_sqrt(n, p):
 
 
 def trial_division(n, P):
+    """ A simple trial division, factors are given by P-list. """
     a = []
     r = n
     l = len(P)
@@ -63,15 +65,14 @@ def trial_division(n, P):
     return a,r,n
 
 
-def filter_p(ppws):
-    """ filter out even powers """
+def filter_out_even_powers(ppws):
+    """ Filter out even powers. """
     d = {}
     for p,pw in ppws:
         if p not in d:
             d[p] = pw
         else:
             d[p] += pw
-    #print(d)
     tmp2 = []
     for p in d:
         if d[p] & 1 != 0: # only keep odd powers
@@ -81,7 +82,7 @@ def filter_p(ppws):
 
 def trial_division_minus_even_powers(n, P):
     a, r, n = trial_division(n, P)
-    a = filter_p(a)
+    a = filter_out_even_powers(a)
     return [a,r,n]
 
 
@@ -133,12 +134,12 @@ def minifactor2(x, P, D = 1):
         D//=x # reduce D
     #print(tmp)
     if R == 1: # if remainder is 1 then we found a B-smooth number then relation.
-        tmp = filter_p(a)  
+        tmp = filter_out_even_powers(a)  
         return (tmp, R, x), D                 
 
 
 def minifactor3(x, P, smooth_base):
-    """ minifactor """
+    """ Minifactor """
     x = abs(x)
     smooth = gcd(x, smooth_base)
     if smooth > 1:
@@ -147,12 +148,12 @@ def minifactor3(x, P, smooth_base):
         a2, r2, n2 = trial_division(not_smooth, P)
         if r2 == 1:
             a = a1 + a2
-            a3 = filter_p(a)
+            a3 = filter_out_even_powers(a)
             return a3, r2, x
         
                          
 def minifactor(x, P):
-    """ minifactor algo, finds odd-power primes in composites """
+    """ Minifactor algo, finds odd-power primes in composites """
     p = trial_division_minus_even_powers(x,P)
     if p[1] == 1: # if 1 x is B-smooth
         return p
@@ -171,6 +172,7 @@ class Poly:
         self.solve_for_x()
  
     def create(self):
+        """ Construct our polynomial. """
         n = self.n
         x_max = self.x_max
         root_2n = isqrt(2*n)
@@ -211,6 +213,7 @@ class Poly:
 
 
     def solve_for_x(self):
+        """ Get the mininmum x value of the polynomial where y=f(x) is a guaranteed relation. """
         A = self.A
         B = self.B
         C = self.C
@@ -234,7 +237,9 @@ class Poly:
                 self.start_vals = start_vals
         return start_vals
 
+
     def eval(self, x):
+        """ Eval the poly: y=f(x), return y and radical (Ax+B)"""
         A = self.A
         B = self.B
         C = self.C
@@ -243,16 +248,18 @@ class Poly:
         return (Rad + B) * x + C, Rad # same as (Ax + 2B)x + C
         
 
-
 def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol = None):
     """ relations search funcion """
-    #print(N,start,stop)
     sys.stderr.write("relations_find: range(%d, %d), interval: %d sieving start\n" % (start, stop, (stop-start)))
-    if (stop-start) < 0:
-        return [] 
 
-    I = [x for x in range(start, stop) if not is_prime(x) and not is_square(x)]
-   
+    #if (stop-start) < 0:
+    #    return [] 
+
+    if (stop-start) > 0:
+        I = [abs(x) for x in range(start, stop) if not is_prime(x) and not is_square(x)]
+    else: # this may not happen
+        I = [abs(x) for x in range(start, stop, -1) if not is_prime(x) and not is_square(x)]
+
     #D = reduce(lambda x, y: x * y, I)
     Diffs = [(pol.eval(x),x) for x in I]
     Found_Rels = []
@@ -273,13 +280,13 @@ def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol
         #r = minifactor2(y, P, D//y)
         #f = minifactor(y, P)
         f = minifactor3(y, P, smooth_base)
-
         #print(r,trial_division(y,P),y)
         if 1:
         #if r != None:
             #f, D = r
             if f != None and f[1] == 1:
                 Rels.append((f,(y,Rad,A,x)))
+
         if i % m == 0:
             lt = time.time()
             td = lt - ltd
@@ -292,18 +299,17 @@ def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol
     sys.stderr.write(msg)
      
     #Rels += Found_Rels
-    
     return Found_Rels
 
 
 def linear_algebra(Rels, P):
-    """ linear algebra, it generates a matrix in GF(2) then computes it's null-space"""
+    """ Linear algebra, it generates a matrix in GF(2) then computes it's left null-space. """
     M = matrix(GF(2), len(Rels), len(P), lambda i, j:P[j] in Rels[i][0][0])
     return M.left_kernel().basis()
 
 
 def process_basis_vectors(N, basis, Rels):
-    """ process each basis vector """
+    """ Process each basis vector, construct (a^2)-(b^2) mod n congruence. """
     for K in basis:
         lhs = rhs = Ahs = 1
         I = [f for f, k in zip(Rels, K) if k == 1]
@@ -319,7 +325,7 @@ def process_basis_vectors(N, basis, Rels):
 
 
 def find_primebase(n, bound):
-    """ finds the base prime for given n and bound """
+    """ Finds the base prime for given n and bound. """
     primes, mod_root, log_p, num_prime, p = [], [], [], 0, 3
     while p < bound or num_prime < 3:
         leg = legendre(n % p, p)
@@ -335,7 +341,7 @@ def find_primebase(n, bound):
 
 
 def recalculate_min_prime_thresh(thresh, Prime_base, log_p):
-    """ recalculates the min efective prime base bound """
+    """ Recalculates the min efective prime base bound. """
     min_prime = int(thresh * 3)
     fudge = sum(log_p[i] for i, p in enumerate(Prime_base) if p < min_prime)
     fudge = fudge // 4
@@ -345,7 +351,7 @@ def recalculate_min_prime_thresh(thresh, Prime_base, log_p):
 
 
 def generate_polys(N, Prime_base, x_max, needed):
-    """ It searchs for distinct needed polys congruent to n."""
+    """ It searchs for distinct needed polys congruent to n. """
     n=1
     cpolys = 0
     polys = []
@@ -369,7 +375,7 @@ def generate_polys(N, Prime_base, x_max, needed):
 
 
 def _MPQS(N, verbose=True, M = 1):
-    """ main MPQS function """
+    """ Main MPQS function. """
     bN, lN = int(log2(N)), len(str(N))
     i2N = isqrt(N) 
     i2Np1 = i2N + 1 
@@ -388,7 +394,6 @@ def _MPQS(N, verbose=True, M = 1):
         return Prime_base + _MPQS(N // Prime_base[0])
 
     x_max = B2 *60  # size of the sieve
-
     m_val = (x_max * root_2n) >> 1
     thresh = log10(m_val) * 0.735
     min_prime = int(thresh * 3)
@@ -400,7 +405,7 @@ def _MPQS(N, verbose=True, M = 1):
     sys.stderr.write("Need %d relations\n" % (required_relations))
 
     start = 0
-    stop = B1
+    stop = B1 # range to sieve
 
     polys, early_factor = generate_polys(N, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
     if polys == None and early_factor != None:
@@ -408,7 +413,7 @@ def _MPQS(N, verbose=True, M = 1):
         return [early_factor] + _MPQS(N // early_factor)
 
     manager = Manager()
-    Rels = manager.list()
+    Rels = manager.list() # placeholder list for relations shareable between child processes.
 
     while True:
         # trim primes, recalc min
@@ -425,7 +430,7 @@ def _MPQS(N, verbose=True, M = 1):
         for poly in polys:
             s1 = min(poly.start_vals[0]) 
             s2 = max(poly.start_vals[0]) 
-            inputs += [(N, start + s1, stop + s1 , Prime_base, smooth_base, Rels, required_relations,  poly)]
+            inputs += [(N, start + s1, stop + s2 , Prime_base, smooth_base, Rels, required_relations,  poly)]
 
         # deploy tasks to every cpu core.
         pols = []
@@ -444,7 +449,7 @@ def _MPQS(N, verbose=True, M = 1):
             sys.stderr.write("Found %d enough relations of %d needed relations...\n" % (len(Rels),required_relations))
             sys.stderr.write("Matrix creation...")
             
-            basis = linear_algebra(Rels, Prime_base)
+            basis = linear_algebra(Rels, Prime_base) # calculate left nullspace of a GF(2) matrix.
 
             t3 = time.time()
             sys.stderr.write("Done in: %f secs.\n" % (t3-t2))
@@ -463,6 +468,7 @@ def _MPQS(N, verbose=True, M = 1):
       
 
 def MPQS(N):
+    """ Iterative version of MPQS. """
     result = _MPQS(N)
     if result != None:
         R= []
