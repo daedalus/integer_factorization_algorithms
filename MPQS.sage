@@ -9,16 +9,7 @@ from gmpy2 import gcd, gcdext, isqrt, is_prime, next_prime, log2, log10, legendr
 from sage.parallel.multiprocessing_sage import parallel_iter
 from multiprocessing import cpu_count, Pool, Manager
 from itertools import repeat
-import pickle
-
-import threading
-import signal
-
-workpool = None
-
-def terminate_signal():
-    signal.raise_signal(signal.SIGTERM)
-    pass
+import humanfriendly
 
 def mod_sqrt(n, p):
     """ tonelli shanks algorithm """
@@ -57,14 +48,8 @@ def mod_sqrt(n, p):
 def trial_division(n, P):
     a = []
     r = n
-    pw = 0
-    if r & 1 == 0:
-        while r & 1 == 0:
-            pw += 1
-            r >>= 1
-        a.append((2,int(pw)))
-    l=len(P)
-    i=0
+    l = len(P)
+    i = 0
     pi2 = pow(P[i],2)
     while (i < l) and (pi2 <= n):
         if r % P[i] == 0:
@@ -78,31 +63,25 @@ def trial_division(n, P):
     return a,r,n
 
 
-def trial_division_minus_even_powers(n, P):
-    a = []
-    r = n
-    pw = 0
-    if r & 1 == 0:
-        while r & 1 == 0:
-            pw += 1
-            r >>= 1
-        if pw & 1 != 0:
-            if 2 not in a:
-                a.append(2)
-    l=len(P)
-    i=0
-    pi2 = pow(P[i],2)
-    while (i < l) and (pi2 <= n):
-        if r % P[i] == 0:
-            pw = 0
-            while r % P[i] == 0:
-                pw += 1
-                r //= P[i]
-            if pw & 1 != 0: 
-                if P[i] not in a:
-                    a.append(P[i])
+def filter_p(ppws):
+    """ filter out even powers """
+    d = {}
+    for p,pw in ppws:
+        if p not in d:
+            d[p] = pw
         else:
-            i += 1
+            d[p] += pw
+    #print(d)
+    tmp2 = []
+    for p in d:
+        if d[p] & 1 != 0: # only keep odd powers
+            tmp2.append(p)
+    return tmp2
+
+
+def trial_division_minus_even_powers(n, P):
+    a, r, n = trial_division(n, P)
+    a = filter_p(a)
     return [a,r,n]
 
 
@@ -154,22 +133,23 @@ def minifactor2(x, P, D = 1):
         D//=x # reduce D
     #print(tmp)
     if R == 1: # if remainder is 1 then we found a B-smooth number then relation.
-        d = {}
-        for p,pw in tmp:
-            if p not in d:
-               d[p] = pw
-            else:
-               d[p] += pw    
-        #print(d)
-        tmp2 = []
-        for p in d:
-            if d[p] & 1 != 0: # only keep odd powers
-                tmp2.append(p)
-            #return (tmp2, R, x)
-        #del tmp, d                 
-        return (tmp2, R, x), D                 
+        tmp = filter_p(a)  
+        return (tmp, R, x), D                 
 
-                     
+
+def minifactor3(x, P, smooth_base):
+    """ minifactor """
+    smooth = gcd(x, smooth_base)
+    if x > smooth > 1:
+        not_smooth = x // smooth
+        a1, r1, n1 = trial_division(smooth, P)
+        a2, r2, n2 = trial_division(not_smooth, P)
+        if r2 == 1:
+            a = a1 + a2
+            a3 = filter_p(a)
+            return a3, r2, x
+        
+                         
 def minifactor(x, P):
     """ minifactor algo, finds odd-power primes in composites """
     p = trial_division_minus_even_powers(x,P)
@@ -262,7 +242,7 @@ class Poly:
         
 
 
-def rels_find(N, start, stop, P, Rels, required_relations, pol = None):
+def rels_find(N, start, stop, P, smooth_base, Rels, required_relations, pol = None):
     """ relations search funcion """
     #print(N,start,stop)
     sys.stderr.write("rels_find: range(%d, %d), interval: %d sieving start\n" % (start, stop, (stop-start)))
@@ -279,22 +259,33 @@ def rels_find(N, start, stop, P, Rels, required_relations, pol = None):
     #B = pol.B
     #C = pol.C
 
-    for i in range(len(Diffs)):
+    ltd = time.time()
+    ld = len(Diffs)
+    m = 1000
+    for i in range(ld):
         if len(Rels) > required_relations:
             break
         yRad, x = Diffs[i]
         y, Rad = yRad
         #r = minifactor2(y, P, D//y)
-        f = minifactor(y, P)
+        #f = minifactor(y, P)
+        f = minifactor3(y, P, smooth_base)
+
         #print(r,trial_division(y,P),y)
         if 1:
         #if r != None:
             #f, D = r
             if f != None and f[1] == 1:
                 Rels.append((f,(y,Rad,A,x)))
-        if i % 1000 == 0:
-            sys.stderr.write("rels_find: range(%d, %d), inverval: %d, found: %d\n" % (start,stop,(stop-start),len(Rels)))
-    sys.stderr.write("rels_find: range(%d, %d), interval: %d, found: %d with prime_base: %d\n" % (start, stop, (stop-start),len(Rels),len(P)))
+        if i % m == 0:
+            lt = time.time()
+            td = lt - ltd
+            ltd = lt
+            eta = td * (ld/m)
+            tds = humanfriendly.format_timespan(td)
+            etas = humanfriendly.format_timespan(eta)
+            sys.stderr.write("rels_find: range(%d, %d), inverval: %d of %d, found: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),len(Rels),tds,etas))
+    sys.stderr.write("rels_find: range(%d, %d, %d), interval: %d of %d, found: %d with prime_base: %d\n" % (start, stop,i, (stop-start),len(Rels),len(P)))
      
     #Rels += Found_Rels
     
@@ -375,7 +366,6 @@ def gen_polys(N, Prime_base, x_max, needed):
 
 def _MPQS(N, verbose=True, M = 1):
     """ main MPQS function """
-    global workpool
     bN, lN = int(log2(N)), len(str(N))
     i2N = isqrt(N) 
     i2Np1 = i2N + 1 
@@ -419,6 +409,7 @@ def _MPQS(N, verbose=True, M = 1):
     while True:
         # trim primes, recalc min
         Prime_base = [p for p in Prime_base if p > min_prime]
+        smooth_base = prod(Prime_base)
         min_prime, thresh, fudge = recalc_min_prime_thresh(thresh, Prime_base, log_p)
 
         t1 = time.time()
@@ -430,7 +421,7 @@ def _MPQS(N, verbose=True, M = 1):
         for poly in polys:
             s1 = min(poly.start_vals[0]) 
             s2 = max(poly.start_vals[0]) 
-            inputs += [(N, start + s1, stop + s1 , Prime_base, Rels, required_relations,  poly)]
+            inputs += [(N, start + s1, stop + s1 , Prime_base, smooth_base, Rels, required_relations,  poly)]
 
         # deploy tasks to every cpu core.
         pols = []
