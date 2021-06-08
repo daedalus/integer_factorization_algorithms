@@ -272,7 +272,11 @@ class Poly:
         self.solve_for_x()
  
     def create(self):
-        """ Construct our polynomial. """
+        """ 
+        Construct our polynomial. 
+        Code borrowed from 
+        https://github.com/elliptic-shiho/primefac-fork/blob/master/_primefac/_factor_algo/_mpqs.py
+        """
         n = self.n
         x_max = self.x_max
         root_2n = isqrt(2*n)
@@ -313,7 +317,11 @@ class Poly:
 
 
     def solve_for_x(self):
-        """ Get the mininmum x value of the polynomial where y=f(x) is a guaranteed relation. """
+        """ 
+        Get the mininmum x value of the polynomial where y=f(x) is a guaranteed relation. 
+        Code borrowed https://github.com/cramppet/quadratic-sieve/blob/master/QS.py
+        """
+        
         A = self.A
         B = self.B
         C = self.C
@@ -434,7 +442,11 @@ def process_basis_vectors(N, basis, Rels, multiplier = 1):
 
 
 def find_primebase(n, bound):
-    """ Finds the base prime for given n and bound. """
+    """ 
+    Finds the base prime for given n and bound. 
+    https://github.com/elliptic-shiho/primefac-fork/blob/master/_primefac/_factor_algo/_mpqs.py
+    
+    """
     primes, mod_root, log_p, num_prime, p = [], [], [], 0, 3
     while p < bound or num_prime < 3:
         leg = legendre(n % p, p)
@@ -450,7 +462,11 @@ def find_primebase(n, bound):
 
 
 def recalculate_min_prime_thresh(thresh, Prime_base, log_p):
-    """ Recalculates the min efective prime base bound. """
+    """ 
+    Recalculates the min efective prime base bound. 
+    code borrowed from:
+    https://github.com/elliptic-shiho/primefac-fork/blob/master/_primefac/_factor_algo/_mpqs.py
+    """
     min_prime = int(thresh * 3)
     fudge = sum(log_p[i] for i, p in enumerate(Prime_base) if p < min_prime)
     fudge = fudge // 4
