@@ -68,7 +68,7 @@ def choose_multiplier(n, prime_list):
     # for the rest of the small factor base primes 
 
     for i in range (1, num_primes):
-        prime = prime_list[i]
+        prime = int(prime_list[i])
         contrib = log(prime) / (prime - 1);
         modp = n % prime
 
@@ -113,7 +113,9 @@ def choose_multiplier(n, prime_list):
     return best_mult;
 
 def mod_sqrt(n, p):
-    """ Tonelli shanks algorithm """
+    """ 
+    Tonelli shanks algorithm 
+    """
     a = n % p
     if p % 4 == 3:
         return pow(a, (p+1) >> 2, p)
@@ -147,7 +149,9 @@ def mod_sqrt(n, p):
 
 
 def trial_division(n, P):
-    """ A simple trial division, factors are given by P-list. """
+    """ 
+    A simple trial division, factors are given by P-list. 
+    """
     a = []
     r = n
     l = len(P)
@@ -166,7 +170,9 @@ def trial_division(n, P):
 
 
 def filter_out_even_powers(ppws):
-    """ Filter out even powers. """
+    """ 
+    Filter out even powers. 
+    """
     d = {}
     for p,pw in ppws:
         if p not in d:
@@ -181,13 +187,18 @@ def filter_out_even_powers(ppws):
 
 
 def trial_division_minus_even_powers(n, P):
+    """
+    Factor a composite n returning only odd power primes.
+    """
     a, r, n = trial_division(n, P)
     a = filter_out_even_powers(a)
     return [a,r,n]
 
 
 def is_smooth(x, P):
-    """ check if n is B-smooth """
+    """ 
+    check if n is B-smooth. 
+    """
     y = x
     for p in P:
         while y % p ==0:
@@ -196,7 +207,9 @@ def is_smooth(x, P):
 
 
 def minifactor2(x, P, D = 1):
-    """ tries to factor out common primes with gcd and filter out even power primes"""
+    """ 
+    Tries to factor out common primes with gcd and filter out even power primes. 
+    """
     tmp = []
     R = 1
     g = gcd(x, D) 
@@ -239,7 +252,9 @@ def minifactor2(x, P, D = 1):
 
 
 def minifactor3(x, P, smooth_base):
-    """ Minifactor """
+    """ 
+    Minifactor. 
+    """
     x = abs(x)
     smooth = gcd(x, smooth_base)
     if smooth > 1:
@@ -253,15 +268,19 @@ def minifactor3(x, P, smooth_base):
         
                          
 def minifactor(x, P):
-    """ Minifactor algo, finds odd-power primes in composites """
+    """ 
+    Minifactor algo, finds odd-power primes in composites. 
+    """
     p = trial_division_minus_even_powers(x,P)
     if p[1] == 1: # if 1 x is B-smooth
         return p
 
 
 class Poly:
-    """ Quadratic polynomial helper class: 
-    type Ax + 2Bx + C """
+    """ 
+    Quadratic polynomial helper class: 
+    type Ax + 2Bx + C 
+    """
     def __init__(self, n, P, x_max, search = 0, verbose = None):
         self.n = int(n)
         self.P = P
@@ -285,7 +304,7 @@ class Poly:
         self.root_A = root_A
         s=0
         leg = 2
-        while leg != 1:
+        while True:
             root_A = next_prime(root_A)
             leg = legendre(n, root_A)
             if leg == 1:
@@ -293,7 +312,10 @@ class Poly:
                     break
             elif leg == 0:
                 self.early_factors.append(root_A)
-            s+=1
+                if s > self.search:
+                    break
+                #break
+            s += 1
 
         self.s = s
         A = int(pow(root_A, 2))
@@ -345,7 +367,9 @@ class Poly:
 
 
     def eval(self, x):
-        """ Eval the poly: y=f(x), return y and radical (Ax+B)"""
+        """ 
+        Eval the poly: y=f(x), return y and radical (Ax+B).
+        """
         A = self.A
         B = self.B
         C = self.C
@@ -355,7 +379,9 @@ class Poly:
         
 
 def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol = None):
-    """ relations search funcion """
+    """ 
+    Relations search funcion 
+    """
     sys.stderr.write("relations_find: range(%d, %d), interval: %d sieving start\n" % (start, stop, (stop-start)))
 
     #if (stop-start) < 0:
@@ -409,13 +435,17 @@ def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol
 
 
 def linear_algebra(Rels, P):
-    """ Linear algebra, it generates a matrix in GF(2) then computes it's left null-space. """
+    """ 
+    Linear algebra, it generates a matrix in GF(2) then computes it's left null-space. 
+    """
     M = matrix(GF(2), len(Rels), len(P), lambda i, j:P[j] in Rels[i][0][0])
     return M.left_kernel().basis()
 
 
 def process_basis_vectors(N, basis, Rels, multiplier = 1):
-    """ Process each basis vector, construct (a^2)-(b^2) mod n congruence. """
+    """ 
+    Process each basis vector, construct (a^2)-(b^2) mod n congruence. 
+    """
     for K in basis:
         lhs = rhs = Ahs = 1
         I = [f for f, k in zip(Rels, K) if k == 1]
@@ -474,14 +504,17 @@ def recalculate_min_prime_thresh(thresh, Prime_base, log_p):
 
 
 def generate_polys(N, Prime_base, x_max, needed):
-    """ It searchs for distinct needed polys congruent to n. """
+    """ 
+    It searchs for distinct needed polys congruent to n. 
+    """
     n=1
     cpolys = 0
     polys = []
     polys_ABC = []
     early_factors = []
     while cpolys <= needed:
-        pol = Poly(N, Prime_base, x_max, search=n, verbose=False)
+        pol = Poly(N, Prime_base, x_max, search = n, verbose=False)
+        #print(pol.early_factors)
         if len(pol.early_factors) > 0:
             for early_factor in pol.early_factors:
                 if early_factor not in early_factors:
@@ -499,7 +532,9 @@ def generate_polys(N, Prime_base, x_max, needed):
 
 
 def _MPQS(N, verbose=True, M = 1):
-    """ Main MPQS function. """
+    """ 
+    Main MPQS function. 
+    """
     bN, lN = int(log2(N)), len(str(N))
     i2N = isqrt(N) 
     i2Np1 = i2N + 1 
@@ -520,8 +555,6 @@ def _MPQS(N, verbose=True, M = 1):
     multiplier = choose_multiplier(N, Prime_base)
     Nm = multiplier * N
     
-    sys.stderr.write("Multiplier is: %d" % multiplier)
-
     x_max = B2 *60  # size of the sieve
     m_val = (x_max * root_2n) >> 1
     thresh = log10(m_val) * 0.735
@@ -531,15 +564,16 @@ def _MPQS(N, verbose=True, M = 1):
     required_relations = round(len(Prime_base) * required_relations_ratio) 
 
     sys.stderr.write("Factoring N: %d, bits: %d, digits: %d, B1: %d, B2: %d\n" % (N,bN,lN,B1,B2))
+    sys.stderr.write("Multiplier is: %d\n" % multiplier)
     sys.stderr.write("Need %d relations\n" % (required_relations))
 
     start = 0
     stop = B1 # range to sieve
 
     polys, early_factors = generate_polys(Nm, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
-    if (early_factors) > 0:
+    if len(early_factors) > 0:
         tmp = 1
-         small = []
+        small = []
         for early_factor in early_factors:
             g = gcd(early_factor, N)    
             if N > g > 1: 
@@ -604,7 +638,9 @@ def _MPQS(N, verbose=True, M = 1):
       
 
 def MPQS(N):
-    """ Iterative version of MPQS. """
+    """ 
+    Iterative version of MPQS. 
+    """
     result = _MPQS(N)
     if result != None:
         R= []
