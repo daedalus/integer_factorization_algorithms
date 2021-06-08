@@ -446,6 +446,10 @@ def transpose(A):
     return(new_A)
 
 def Gaussian_elimination_GF2(A):
+  """
+  Gaussian elimination over GF2
+  https://www.cs.umd.edu/~gasarch/TOPICS/factoring/fastgauss.pdf, page2
+  """
   h = len(A)
   m = len(A[0])
   marks = [False] * h
@@ -634,7 +638,7 @@ def _MPQS(N, verbose=True, M = 1):
         for poly in polys:
             s1 = min(poly.start_vals[0]) 
             s2 = max(poly.start_vals[0]) 
-            inputs += [(Nm, start + s1, stop + s2 , Prime_base, smooth_base, Rels, required_relations,  poly)]
+            inputs += [(Nm, start + s1, stop + s1 , Prime_base, smooth_base, Rels, required_relations,  poly)]
 
         # deploy tasks to every cpu core.
         pols = []
