@@ -436,7 +436,7 @@ def process_basis_vectors(N, basis, Rels, multiplier = 1):
                             tmp2.append(factor//ignoreme)
                     return tmp2
                 else:
-                    return tmp
+                    return factors
 
 
 def find_primebase(n, bound):
