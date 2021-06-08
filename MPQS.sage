@@ -446,7 +446,7 @@ def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol
             if f != None:
                 filtered = (filter_out_even_powers(f[0]),f[1],y)
                 if f[1] == 1:    
-                    Rels.append([f[0], y, Rad, A])
+                    Rels.append([filtered, y, Rad, A])
                 elif f[1] in partials:
                     a = partials[f[1]]
                     p = filter_out_even_powers(f[0] + a[0])
