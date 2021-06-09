@@ -15,7 +15,7 @@ https://en.wikipedia.org/wiki/Quadratic_sieve
 
 import time
 import sys
-from gmpy2 import gcd, gcdext, isqrt, is_prime, next_prime, log2, log10, legendre, powmod, invert
+from gmpy2 import gcd, gcdext, sqrt, isqrt, is_prime, next_prime, log2, log10, legendre, powmod, invert
 from sage.parallel.multiprocessing_sage import parallel_iter
 from multiprocessing import cpu_count, Pool, Manager
 from itertools import repeat
@@ -292,6 +292,7 @@ def pollard_rho_iter(n, P):
             if is_prime(p):
                 if p in P:
                     if R % p == 0:
+                        pw = 0
                         while R > 1 and R % p == 0:
                             R //= p
                             pw += 1
@@ -326,7 +327,7 @@ def minifactor4(x, P, smooth_base):
     smooth = gcd(x, smooth_base)
     if smooth > 1:
         not_smooth = x // smooth
-        a1, r1, n1 = pollard_rho_iter(smooth, P)
+        a1, r1, n1 = trial_division(smooth, P)
         a2, r2, n2 = trial_division(not_smooth, P)
     else:
         a2, r2, n2 = trial_division(x, P) 
@@ -427,7 +428,7 @@ class Poly:
         B = self.B
         C = self.C
         n = self.n
-        start_vals = []
+        start_vals = {}
         #for p in self.P:
         p = self.root_A
         g = 1
@@ -442,8 +443,8 @@ class Poly:
                 r2 = (-1 * r1) % p
                 start1 = (ainv * (r1 - B)) % p
                 start2 = (ainv * (r2 - B)) % p
-                start_vals.append([int(start1), int(start2)])
-                self.start_vals = start_vals
+                start_vals[p] = [int(start1), int(start2)]
+        self.start_vals = start_vals
         return start_vals
 
 
@@ -464,17 +465,8 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
     Relations search funcion 
     """
     sys.stderr.write("relations_find: range(%d, %d), interval: %d sieving start\n" % (start, stop, (stop-start)))
-
-    #if (stop-start) < 0:
-    #    return [] 
-
-    if (stop-start) > 0:
-        I = [abs(x) for x in range(start, stop) if not is_prime(x) and not is_square(x)]
-    else: # this may not happen
-        I = [abs(x) for x in range(start, stop, -1) if not is_prime(x) and not is_square(x)]
-
     #D = reduce(lambda x, y: x * y, I)
-    Diffs = [(pol.eval(x),x) for x in I]
+    Diffs = [(pol.eval(abs(x)),abs(x)) for x in range(start, stop)]
     Found_Rels = []
     A = pol.A
     #B = pol.B
@@ -491,19 +483,22 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
             break
         yRad, x = Diffs[i]
         y, Rad = yRad
-        f = minifactor5(y, P, smooth_base)
+        y = abs(y)
+        f = minifactor4(y, P, smooth_base)
         if 1:
             if f != None:
-                filtered = (filter_out_even_powers(f[0]),f[1],y)
-                if f[1] == 1:    
-                    Rels.append([filtered, y, Rad, A])
+                filtered = filter_out_even_powers(f[0])
+                if f[1] == 1:   
+                    rel = [filtered, y, Rad, A] 
+                    #print(rel)
+                    Rels.append(rel)
                 elif f[1] in partials:
                     a = partials[f[1]]
                     p = filter_out_even_powers(f[0] + a[0])
                     Rels.append([p, y * a[1], Rad * a[2], A* a[3]])
-                    with merged_count.get_lock():
-                        merged_count.value += 1
-                    del partials[f[1]]
+                    #with merged_count.value.get_lock():
+                    merged_count.value += 1
+                    #del partials[f[1]]
                 else:
                     partials[f[1]] = [f[0], y, Rad, A]
         if i % m == 0:
@@ -513,9 +508,9 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
             ltd = lt
             if lRels > 0:
                 #eta = td * (((ld / m) + (required_relations / lRels)) / 2)
-                eta = td * isqrt((ld / m)**2 + (required_relations / lRels)**2)
+                eta = int(td * sqrt((ld / m)**2 + (required_relations / lRels)**2))
             else:
-                eta = td * (ld / m)
+                eta = int(td * (ld / m))
             tds = humanfriendly.format_timespan(td)
             etas = humanfriendly.format_timespan(eta)
             msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),lRels,required_relations, merged_count.value,tds,etas)
@@ -528,6 +523,7 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
     
     #Rels += Found_Rels
     return Found_Rels
+    
 
 def transpose(A):
     """
@@ -583,6 +579,8 @@ def process_basis_vectors(N, basis, Rels, multiplier = 1):
     for K in basis:
         lhs = rhs = Ahs = 1
         I = [f for f, k in zip(Rels, K) if k == 1]
+        #print(I)
+        #sys.exit(0)
         if len(I) > 0:
             for i in I:
                 lhs *= i[1] # left-hand side
@@ -609,12 +607,12 @@ def find_primebase(n, bound):
     https://github.com/elliptic-shiho/primefac-fork/blob/master/_primefac/_factor_algo/_mpqs.py
     Same as the sieve of erathostenes.
     """
-    primes, mod_root, log_p, num_prime, p = [], [], [], 0, 3
+    primes, mod_root, log_p, num_prime, p = [], {}, [], 0, 3
     while num_prime <= bound:
         leg = legendre(n % p, p)
         if leg == 1:
             primes += [p]
-            #mod_root += mod_sqrt(n ,p)
+            #mod_root[p] = mod_sqrt(n ,p)
             log_p += [log10(p)]
             num_prime += 1
         elif leg == 0:
@@ -785,9 +783,8 @@ def _MPQS(N, verbose=True, M = 1):
         
         # generate tasks parameters
         for poly in polys:
-            s1 = min(poly.start_vals[0]) 
-            s2 = max(poly.start_vals[0]) 
-            inputs += [(Nm, start + s1, stop + s1 , Prime_base, smooth_base, Rels, merged_count, required_relations,  poly)]
+            inputs += [(Nm, start, stop, Prime_base, smooth_base, Rels, merged_count, required_relations, poly)]
+
 
         # deploy tasks to every cpu core.
         pols = []
