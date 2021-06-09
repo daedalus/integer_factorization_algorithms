@@ -512,7 +512,8 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
             td = lt - ltd
             ltd = lt
             if lRels > 0:
-                eta = td * (((ld / m) + (required_relations / lRels)) / 2)
+                #eta = td * (((ld / m) + (required_relations / lRels)) / 2)
+                eta = td * isqrt((ld / m)**2 + (required_relations / lRels)**2)
             else:
                 eta = td * (ld / m)
             tds = humanfriendly.format_timespan(td)
