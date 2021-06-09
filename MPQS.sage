@@ -278,7 +278,7 @@ def pollard_rho_iter(n, P):
     tmp = []
     r = [n]
     R = n
-    while True:
+    while len(r) > 0:
         x = r.pop()
         if x < P[-1]:
             for p in P:
@@ -288,7 +288,7 @@ def pollard_rho_iter(n, P):
                         pw += 1
                     tmp.append((p,pw))
         else:
-            p = pollard_rho_iter(x, P)
+            p = pollard_rho(x)
             if is_prime(p):
                 if p in P:
                     if R % p == 0:
