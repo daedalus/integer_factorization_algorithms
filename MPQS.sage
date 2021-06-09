@@ -609,7 +609,7 @@ def find_primebase(n, bound):
     Same as the sieve of erathostenes.
     """
     primes, mod_root, log_p, num_prime, p = [], [], [], 0, 3
-    while p < bound or num_prime < 3:
+    while num_prime <= bound:
         leg = legendre(n % p, p)
         if leg == 1:
             primes += [p]
