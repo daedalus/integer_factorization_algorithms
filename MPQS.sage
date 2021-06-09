@@ -502,7 +502,7 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
                     p = filter_out_even_powers(f[0] + a[0])
                     Rels.append([p, y * a[1], Rad * a[2], A* a[3]])
                     with merged_count.get_lock():
-                        merged_count += 1
+                        merged_count.value += 1
                     del partials[f[1]]
                 else:
                     partials[f[1]] = [f[0], y, Rad, A]
@@ -517,12 +517,12 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
                 eta = td * (ld / m)
             tds = humanfriendly.format_timespan(td)
             etas = humanfriendly.format_timespan(eta)
-            msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),lRels,required_relations, merged_count,tds,etas)
+            msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),lRels,required_relations, merged_count.value,tds,etas)
             sys.stderr.write(msg)
     
     td = time.time() - st
     tds = humanfriendly.format_timespan(td)
-    msg = "relations_find: Ended range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, time elapsed: %s\n" % (start,stop,i,(stop-start),len(Rels),required_relations, merged_count, tds)
+    msg = "relations_find: Ended range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, time elapsed: %s\n" % (start,stop,i,(stop-start),len(Rels),required_relations, merged_count.value, tds)
     sys.stderr.write(msg)
     
     #Rels += Found_Rels
