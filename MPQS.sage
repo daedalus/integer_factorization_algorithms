@@ -428,12 +428,12 @@ class Poly:
         B = self.B
         C = self.C
         n = self.n
-        start_vals = {}
+        start_vals = []
         #for p in self.P:
         p = self.root_A
         g = 1
-        while g == 1:
         #for p in self.P:
+        while g == 1:
             p = next_prime(p)
             ainv = 1
             if A != 1:
@@ -443,7 +443,7 @@ class Poly:
                 r2 = (-1 * r1) % p
                 start1 = (ainv * (r1 - B)) % p
                 start2 = (ainv * (r2 - B)) % p
-                start_vals[p] = [int(start1), int(start2)]
+                start_vals = [[int(start1), int(start2)],p]
         self.start_vals = start_vals
         return start_vals
 
@@ -464,9 +464,11 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
     """ 
     Relations search funcion 
     """
-    sys.stderr.write("relations_find: range(%d, %d), interval: %d sieving start\n" % (start, stop, (stop-start)))
+    s = min(pol.start_vals[0])
+    #s = 0
+    sys.stderr.write("relations_find: range(%d, %d), interval: %d sieving start\n" % (start + s, stop + s, (stop-start)))
     #D = reduce(lambda x, y: x * y, I)
-    Diffs = [(pol.eval(abs(x)),abs(x)) for x in range(start, stop)]
+    Diffs = [(pol.eval(abs(x)),abs(x)) for x in range(start + s, stop + s)]
     Found_Rels = []
     A = pol.A
     #B = pol.B
@@ -486,9 +488,9 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
         y = abs(y)
         f = minifactor4(y, P, smooth_base)
         if 1:
-            if f != None:
-                filtered = filter_out_even_powers(f[0])
+            if f != None:            
                 if f[1] == 1:   
+                    filtered = filter_out_even_powers(f[0])
                     rel = [filtered, y, Rad, A] 
                     #print(rel)
                     Rels.append(rel)
