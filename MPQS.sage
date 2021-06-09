@@ -479,7 +479,7 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
     A = pol.A
     #B = pol.B
     #C = pol.C
-    st = time.time
+    st = time.time()
     ltd = st
     ld = len(Diffs)
     m = 1000
