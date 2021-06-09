@@ -280,20 +280,20 @@ def pollard_rho_iter(n, P):
     R = n
     while True:
         x = r.pop()
-        if x < P[-1]
+        if x < P[-1]:
             for p in P:
                 if R % p == 0:
                     while x % p == 0:
-                        R // = p            
+                        R //= p            
                         pw += 1
                     tmp.append((p,pw))
         else:
-            p = pollard_rho_iter(x)
+            p = pollard_rho_iter(x, P)
             if is_prime(p):
                 if p in P:
                     if R % p == 0:
                         while R > 1 and R % p == 0:
-                            R // = p
+                            R //= p
                             pw += 1
                         tmp.append((p,pw))
             #else:   
@@ -670,48 +670,48 @@ def prebuilt_params(bits):
     borrowed from msieve/mpqs.c
     """
     if bits <= 64:
-	    return [100, 40, 1 * 65536]
-	if bits <= 128: 
-	    return [450, 40, 1 * 65536]
-	if bits <= 183:
-	    return [2000, 40, 1 * 65536]
-	if bits <= 200: 
-	    return [3000, 50, 1 * 65536]
-	if bits <= 212: 
-	    return [5400, 50, 3 * 65536]
-	if bits <= 233
-	    return [10000, 100, 3 * 65536]
-	if bits <= 249:
-	    return [27000, 100, 3 * 65536]
-	if bits <= 266:
-	    return [50000, 100, 3 * 65536]
-	if bits <= 283:
-	    return [55000, 80, 3 * 65536]
-	if bits <= 298:
-	    return [60000, 80, 9 * 65536]
-	if bits <= 315:
-	    return [80000, 150, 9 * 65536]
-	if bits <= 332:
-	    return [100000, 150, 9 * 65536]
-	if bits <= 348:
-	    return [140000, 150, 9 * 65536]
-	if bits <= 363:
-	    return [210000, 150, 13 * 65536]
-	if bits <= 379:
-	    return [300000, 150, 17 * 65536]
-	if bits <= 395:
-	    return [400000, 150, 21 * 65536]
-	if bits <= 415:
-	    return [500000, 150, 25 * 65536] # beyond this point you're crazy 
-	if bits <= 440:
-	    return [700000, 150, 33 * 65536]
-	if bits <= 465:
-	    return [900000, 150, 50 * 65536]
-	if bits <= 490:
-	    return [1100000, 150, 75 * 65536]
-	if bits <= 512:
-	    return [1300000, 150, 100 * 65536]
-	return [1300000, 150, 100 * 65536]
+        return [100, 40, 1 * 65536]
+    if bits <= 128: 
+        return [450, 40, 1 * 65536]
+    if bits <= 183:
+        return [2000, 40, 1 * 65536]
+    if bits <= 200: 
+        return [3000, 50, 1 * 65536]
+    if bits <= 212: 
+        return [5400, 50, 3 * 65536]
+    if bits <= 233:
+        return [10000, 100, 3 * 65536]
+    if bits <= 249:
+        return [27000, 100, 3 * 65536]
+    if bits <= 266:
+        return [50000, 100, 3 * 65536]
+    if bits <= 283:
+        return [55000, 80, 3 * 65536]
+    if bits <= 298:
+        return [60000, 80, 9 * 65536]
+    if bits <= 315:
+        return [80000, 150, 9 * 65536]
+    if bits <= 332:
+        return [100000, 150, 9 * 65536]
+    if bits <= 348:
+        return [140000, 150, 9 * 65536]
+    if bits <= 363:
+        return [210000, 150, 13 * 65536]
+    if bits <= 379:
+        return [300000, 150, 17 * 65536]
+    if bits <= 395:
+        return [400000, 150, 21 * 65536]
+    if bits <= 415:
+        return [500000, 150, 25 * 65536] # beyond this point you're crazy 
+    if bits <= 440:
+        return [700000, 150, 33 * 65536]
+    if bits <= 465:
+        return [900000, 150, 50 * 65536]
+    if bits <= 490:
+        return [1100000, 150, 75 * 65536]
+    if bits <= 512:
+        return [1300000, 150, 100 * 65536]
+    return [1300000, 150, 100 * 65536]
 
 
 def _MPQS(N, verbose=True, M = 1):
