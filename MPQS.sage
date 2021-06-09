@@ -460,7 +460,10 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
             lt = time.time()
             td = lt - ltd
             ltd = lt
-            eta = td * (((ld / m) + (required_relations / lRels)) / 2)
+            if lRels > 0:
+                eta = td * (((ld / m) + (required_relations / lRels)) / 2)
+            else:
+                eta = td * (ld / m)
             tds = humanfriendly.format_timespan(td)
             etas = humanfriendly.format_timespan(eta)
             msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),lRels,required_relations, merged_count,tds,etas)
