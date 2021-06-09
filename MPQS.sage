@@ -450,17 +450,20 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
                     a = partials[f[1]]
                     p = filter_out_even_powers(f[0] + a[0])
                     Rels.append([p, y * a[1], Rad * a[2], A* a[3]])
-                    merged_count += 1
+                    with merged_count.get_lock():
+                        merged_count += 1
+                    del partials[f[1]]
                 else:
                     partials[f[1]] = [f[0], y, Rad, A]
         if i % m == 0:
+            lRels = len(Rels)
             lt = time.time()
             td = lt - ltd
             ltd = lt
-            eta = td * (ld/m)
+            eta = td * (((ld / m) + (required_relations / lRels)) / 2)
             tds = humanfriendly.format_timespan(td)
             etas = humanfriendly.format_timespan(eta)
-            msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),len(Rels),required_relations, merged_count,tds,etas)
+            msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),lRels,required_relations, merged_count,tds,etas)
             sys.stderr.write(msg)
     
     td = time.time() - st
