@@ -264,6 +264,43 @@ def minifactor2(x, P, D = 1):
         return (tmp, R, x), D                 
 
 
+def pollard_rho(n, seed=2, p=2, c=1):
+        f = lambda x: x ** p + c
+        x, y, d = seed, seed, 1
+        while d == 1:
+            x = f(x) % n
+            y = f(f(y)) % n
+            d = gcd((x - y) % n, n)
+            if N > d > 1:
+                return d
+                
+def pollard_rho_iter(n, P):
+    tmp = []
+    r = [n]
+    R = n
+    while True:
+        x = r.pop()
+        if x < P[-1]
+            for p in P:
+                if R % p == 0:
+                    while x % p == 0:
+                        R // = p            
+                        pw += 1
+                    tmp.append((p,pw))
+        else:
+            p = pollard_rho_iter(x)
+            if is_prime(p):
+                if p in P:
+                    if R % p == 0:
+                        while R > 1 and R % p == 0:
+                            R // = p
+                            pw += 1
+                        tmp.append((p,pw))
+            #else:   
+            else:
+                r.append(p)
+    return merge_powers(tmp), R, n        
+                
 def minifactor3(x, P, smooth_base):
     """ 
     Minifactor. 
@@ -289,13 +326,27 @@ def minifactor4(x, P, smooth_base):
     smooth = gcd(x, smooth_base)
     if smooth > 1:
         not_smooth = x // smooth
-        a1, r1, n1 = trial_division(smooth, P)
+        a1, r1, n1 = pollard_rho_iter(smooth, P)
         a2, r2, n2 = trial_division(not_smooth, P)
     else:
         a2, r2, n2 = trial_division(x, P) 
     return merge_powers(a1 + a2), r2, x
 
-        
+
+def minifactor5(x, P, smooth_base):
+    """ 
+    Minifactor. 
+    """
+    x = abs(x)
+    a1 = []
+    smooth = gcd(x, smooth_base)
+    if smooth > 1:
+        not_smooth = x // smooth
+        a1, r1, n1 = trial_division(smooth, P)
+        a2, r2, n2 = pollard_rho_iter(not_smooth, P)
+    else:
+        a2, r2, n2 = pollard_rho_iter(x, P) 
+    return merge_powers(a1 + a2), r2, x
                          
 def minifactor(x, P):
     """ 
@@ -440,7 +491,7 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
             break
         yRad, x = Diffs[i]
         y, Rad = yRad
-        f = minifactor4(y, P, smooth_base)
+        f = minifactor5(y, P, smooth_base)
         if 1:
             if f != None:
                 filtered = (filter_out_even_powers(f[0]),f[1],y)
