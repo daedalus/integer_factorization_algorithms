@@ -408,7 +408,7 @@ class Poly:
         return (Rad + B) * x + C, Rad # same as (Ax + 2B)x + C
         
 
-def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol = None):
+def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_relations, pol = None):
     """ 
     Relations search funcion 
     """
@@ -425,17 +425,16 @@ def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol
     #D = reduce(lambda x, y: x * y, I)
     Diffs = [(pol.eval(x),x) for x in I]
     Found_Rels = []
-
     A = pol.A
     #B = pol.B
     #C = pol.C
-
-    ltd = time.time()
+    st = time.time
+    ltd = st
     ld = len(Diffs)
     m = 1000
     msg = ""
     partials = {}
-    merged = 0
+
     for i in range(ld):
         if len(Rels) > required_relations:
             break
@@ -451,7 +450,7 @@ def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol
                     a = partials[f[1]]
                     p = filter_out_even_powers(f[0] + a[0])
                     Rels.append([p, y * a[1], Rad * a[2], A* a[3]])
-                    merged += 1
+                    merged_count += 1
                 else:
                     partials[f[1]] = [f[0], y, Rad, A]
         if i % m == 0:
@@ -461,10 +460,12 @@ def relations_find(N, start, stop, P, smooth_base, Rels, required_relations, pol
             eta = td * (ld/m)
             tds = humanfriendly.format_timespan(td)
             etas = humanfriendly.format_timespan(eta)
-            msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),len(Rels),required_relations, merged,tds,etas)
+            msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,(stop-start),len(Rels),required_relations, merged_count,tds,etas)
             sys.stderr.write(msg)
     
-    msg = "relations_find: Ended range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d\n" % (start,stop,i,(stop-start),len(Rels),required_relations, merged)
+    td = time.time() - st
+    tds = humanfriendly.format_timespan(td)
+    msg = "relations_find: Ended range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, time elapsed: %s\n" % (start,stop,i,(stop-start),len(Rels),required_relations, merged_count, tds)
     sys.stderr.write(msg)
     
     #Rels += Found_Rels
@@ -660,6 +661,8 @@ def _MPQS(N, verbose=True, M = 1):
     manager = Manager()
     Rels = manager.list() # placeholder list for relations shareable between child processes.
 
+    merged_count = manager.Value("i", 0)
+
     while True:
         # trim primes, recalc min
         Prime_base = [p for p in Prime_base if p > min_prime]
@@ -675,7 +678,7 @@ def _MPQS(N, verbose=True, M = 1):
         for poly in polys:
             s1 = min(poly.start_vals[0]) 
             s2 = max(poly.start_vals[0]) 
-            inputs += [(Nm, start + s1, stop + s1 , Prime_base, smooth_base, Rels, required_relations,  poly)]
+            inputs += [(Nm, start + s1, stop + s1 , Prime_base, smooth_base, Rels, merged_count, required_relations,  poly)]
 
         # deploy tasks to every cpu core.
         pols = []
@@ -733,5 +736,6 @@ if __name__ == "__main__":
     ts = time.time()
     r = MPQS(N)
     print(r)
-    td = time.time()
-    sys.stderr.write("All done in: %f secs.\n" % (td-ts))
+    td = time.time() - ts
+    tds = humanfriendly.format_timespan(td) 
+    sys.stderr.write("All done in: %s.\n" % (tds))
