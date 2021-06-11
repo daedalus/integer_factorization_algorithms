@@ -13,9 +13,10 @@ It was invented by Carl Pomerance in 1981 as an improvement to Schroeppel's line
 https://en.wikipedia.org/wiki/Quadratic_sieve
 """
 
+import os
 import time
 import sys
-from gmpy2 import gcd, gcdext, sqrt, isqrt, is_prime, next_prime, log2, log10, legendre, powmod, invert
+from gmpy2 import gcd, gcdext, sqrt, isqrt, is_prime, next_prime, log2, log10, log, legendre, powmod, invert
 from sage.parallel.multiprocessing_sage import parallel_iter
 from multiprocessing import cpu_count, Pool, Manager
 from itertools import repeat
@@ -105,8 +106,6 @@ def choose_multiplier(n, prime_list):
     best_score = 1000.0
     best_mult = 1
 
-    #print(scores)
-   
     for i in range(0, num_multipliers):
         score = scores[i];
         if (score < best_score):
@@ -150,6 +149,16 @@ def mod_sqrt(n, p):
         return a  # p == 2
 
 
+def is_power_logprime(n, min_log_primes):
+    ispow = False
+    for p in min_log_primes:
+        a = log(n) / p
+        b = int(a)
+        if a == b:
+            iwpow = True
+    return ispow
+
+
 def trial_division(n, P):
     """ 
     A simple trial division, factors are given by P-list. 
@@ -158,16 +167,20 @@ def trial_division(n, P):
     r = n
     l = len(P)
     i = 0
-    pi2 = pow(P[i],2)
-    while (i < l) and (pi2 <= n):
-        if r % P[i] == 0:
-            pw = 0
-            while r % P[i] == 0:
-                pw += 1
-                r //= P[i]
-            a.append((int(P[i]),int(pw)))
-        else:
-            i += 1
+    if n > P[0]:
+        while (i < l):
+            if r >= P[i]:
+            #if 1:
+                if r % P[i] == 0:
+                    pw = 0
+                    while r % P[i] == 0:
+                        pw += 1
+                        r //= P[i]
+                    a.append((int(P[i]),int(pw)))
+                else:
+                    i += 1
+            else:
+                break
     return a,r,n
 
 def merge_powers(ppws):
@@ -219,106 +232,7 @@ def is_smooth(x, P):
     return abs(y) == 1 
 
 
-def minifactor2(x, P, D = 1):
-    """ 
-    Tries to factor out common primes with gcd and filter out even power primes. 
-    """
-    tmp = []
-    R = 1
-    g = gcd(x, D) 
-    if x > g > 1: # if there is a common factor try to factor primes from that factor
-        gtmp = [g, x//g]
-        for g1 in gtmp:
-            if not is_prime(g1):
-                i = isqrt(abs(g1))
-                if i**2 != abs(g1): # g1 should not be square
-                    a, r, n = trial_division(g1,P)
-                    tmp += a
-                    R *= r
-                else:
-                    if is_prime(i):
-                        if i > P[-1] or i < P[0]:  
-                            R *= i
-                        else:
-                        #a, r, n = [i], 1, g1
-                            tmp += [(i,2)]
-                            #R //= g1
-                    else:
-                        #R *= r
-                        gtmp.append(i)    
-            else:
-                if g1 > P[-1] or g1 < P[0]:
-                    R *= g1
-                else:
-                    tmp += [(g1,1)]
-                    #R //= g1
-        D//=g # reduce D
-    else: # if not proceed as always
-        a, r, n = trial_division(x,P)
-        R *= r
-        tmp += a
-        D//=x # reduce D
-    #print(tmp)
-    if R == 1: # if remainder is 1 then we found a B-smooth number then relation.
-        tmp = filter_out_even_powers(a)  
-        return (tmp, R, x), D                 
-
-
-def pollard_rho(n, seed=2, p=2, c=1):
-        f = lambda x: x ** p + c
-        x, y, d = seed, seed, 1
-        while d == 1:
-            x = f(x) % n
-            y = f(f(y)) % n
-            d = gcd((x - y) % n, n)
-            if N > d > 1:
-                return d
-                
-def pollard_rho_iter(n, P):
-    tmp = []
-    r = [n]
-    R = n
-    while len(r) > 0:
-        x = r.pop()
-        if x < P[-1]:
-            for p in P:
-                if R % p == 0:
-                    while x % p == 0:
-                        R //= p            
-                        pw += 1
-                    tmp.append((p,pw))
-        else:
-            p = pollard_rho(x)
-            if is_prime(p):
-                if p in P:
-                    if R % p == 0:
-                        pw = 0
-                        while R > 1 and R % p == 0:
-                            R //= p
-                            pw += 1
-                        tmp.append((p,pw))
-            #else:   
-            else:
-                r.append(p)
-    return merge_powers(tmp), R, n        
-                
-def minifactor3(x, P, smooth_base):
-    """ 
-    Minifactor. 
-    """
-    x = abs(x)
-    smooth = gcd(x, smooth_base)
-    if smooth > 1:
-        not_smooth = x // smooth
-        a1, r1, n1 = trial_division(smooth, P)
-        a2, r2, n2 = trial_division(not_smooth, P)
-        if r2 == 1:
-            a = a1 + a2
-            a3 = filter_out_even_powers(a)
-            return a3, r2, x
-
-
-def minifactor4(x, P, smooth_base):
+def minifactor(x, P, smooth_base):
     """ 
     Minifactor. 
     """
@@ -332,30 +246,6 @@ def minifactor4(x, P, smooth_base):
     else:
         a2, r2, n2 = trial_division(x, P) 
     return merge_powers(a1 + a2), r2, x
-
-
-def minifactor5(x, P, smooth_base):
-    """ 
-    Minifactor. 
-    """
-    x = abs(x)
-    a1 = []
-    smooth = gcd(x, smooth_base)
-    if smooth > 1:
-        not_smooth = x // smooth
-        a1, r1, n1 = trial_division(smooth, P)
-        a2, r2, n2 = pollard_rho_iter(not_smooth, P)
-    else:
-        a2, r2, n2 = pollard_rho_iter(x, P) 
-    return merge_powers(a1 + a2), r2, x
-                         
-def minifactor(x, P):
-    """ 
-    Minifactor algo, finds odd-power primes in composites. 
-    """
-    p = trial_division_minus_even_powers(x,P)
-    if p[1] == 1: # if 1 x is B-smooth
-        return p
 
 
 class Poly:
@@ -388,7 +278,9 @@ class Poly:
         s=0
         leg = 2
         while True:
-            root_A = next_prime(root_A)
+            root_A = next_prime(root_A + s)
+            #root_A = next_prime(root_A)
+
             leg = legendre(n, root_A)
             if leg == 1:
                 if s > self.search:
@@ -483,20 +375,39 @@ class Poly:
         return (Rad + B) * x + C, Rad # same as (Ax + 2B)x + C
         
 
-def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, poly = None):
+def is_power(n, minprimes):
+    ispow = False
+    c = 0
+    for p in minprimes:
+        a = log(n) / log(p)
+        b = int(a)
+        if a == b:
+            ispow = True
+            c = b
+    return ispow
+
+
+def is_power_logprime(n, min_log_primes):
+    ispow = False
+    for p in min_log_primes:
+        a = log(n) / p
+        b = int(a)
+        if a == b:
+            iwpow = True
+    return ispow
+
+def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, poly = None):
     """ 
     Relations search funcion 
     """
-    sys.stderr.write("relations_find: range(%d, %d), interval: %d sieving start\n" % (start, stop, (stop-start)))
-    #D = reduce(lambda x, y: x * y, I)
-   
-    #sums = poly.calc_sums()
+    #pid = os.getpid()
+    pid = taskid
+    tasks.value += 1
+    sys.stderr.write("[%d] relations_find: range(%d, %d), interval: %d sieving start\n" % (pid,start, stop, (stop-start)))
     Diffs = [(poly.eval(abs(x)),abs(x)) for x in range(start, stop)]
 
     Found_Rels = []
     A = poly.A
-    #B = pol.B
-    #C = pol.C
     st = time.time()
     ltd = st
     ld = len(Diffs)
@@ -510,17 +421,12 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
         yRad, x = Diffs[i]
         y, Rad = yRad
         y = abs(y)
-        l10 = log10(y) 
-        if l10 < thresh:
-            print("Value %d: %d < %d" % (y,l10,thresh))
-        else:
-            f = minifactor4(y, P, smooth_base)
-        #if 1:
+        if not is_prime(y) and not is_square(y) and not is_power_logprime(y, min_log_primes):
+            f = minifactor(y, P, smooth_base)
             if f != None:            
                 if f[1] == 1:   
                     filtered = filter_out_even_powers(f[0])
                     rel = [filtered, y, Rad, A] 
-                    #print(rel)
                     Rels.append(rel)
                 elif f[1] in partials:
                     a = partials[f[1]]
@@ -535,9 +441,7 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
                         sys.stderr.write("Found cycle with partial\n")
                     else:
                         Rels.append([p, rhs, lhs, Ahs])
-                    #with merged_count.value.get_lock():
                     merged_count.value += 1
-                    #del partials[f[1]]
                 else:
                     partials[f[1]] = [f[0], y, Rad, A]
         if i % m == 0:
@@ -545,22 +449,23 @@ def relations_find(N, start, stop, P, smooth_base, Rels, merged_count, required_
             lt = time.time()
             td = lt - ltd
             ltd = lt
-            if lRels > 0:
-                #eta = td * (((ld / m) + (required_relations / lRels)) / 2)
-                eta = int(td * sqrt((ld / m)**2 + (required_relations / lRels)**2))
+            if i > 0:
+                if lRels > 0:
+                    eta = int(td * sqrt((ld / m)**2 + (required_relations / lRels)**2))
+                else:
+                    eta = int(td * (ld / m))
+                etas = humanfriendly.format_timespan(eta)
             else:
-                eta = int(td * (ld / m))
+                etas = "No ETA estimated"
             tds = humanfriendly.format_timespan(td)
-            etas = humanfriendly.format_timespan(eta)
-            msg = "relations_find: range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, iter_elapsed: %s, eta: %s.\n" % (start,stop,i,ld,lRels,required_relations, merged_count.value,tds,etas)
+            msg = "[%d] relations_find: range (%d, %d , %d), found: %d of %d, merged: %d, iter_elapsed: %s, eta: %s, alive tasks: %d.\n" % (pid, start,i,ld,lRels,required_relations, merged_count.value,tds,etas,tasks.value)
             sys.stderr.write(msg)
     
     td = time.time() - st
     tds = humanfriendly.format_timespan(td)
-    msg = "relations_find: Ended range(%d, %d), inverval: %d of %d, found: %d of %d, merged: %d, time elapsed: %s\n" % (start,stop,i,ld,len(Rels),required_relations, merged_count.value, tds)
+    msg = "[%d] relations_find: Ended range(%d, %d, %d), found: %d of %d, merged: %d, time elapsed: %s, alive tasks: %d.\n" % (pid, start,i,ld,len(Rels),required_relations, merged_count.value, tds, tasks.value)
     sys.stderr.write(msg)
-    
-    #Rels += Found_Rels
+    tasks.value -= 1
     return Found_Rels
     
 
@@ -575,6 +480,7 @@ def transpose(A):
             new_row.append(row[i])
         new_A.append(new_row)
     return(new_A)
+
 
 def Gaussian_elimination_GF2(A):
   """
@@ -594,6 +500,7 @@ def Gaussian_elimination_GF2(A):
           break
   return marks, A
 
+
 def left_nullspace(A):
     """
     Compute left null space:
@@ -601,7 +508,13 @@ def left_nullspace(A):
     """
     A = transpose(A)
     marks, A = Gaussian_elimination_GF2(A)
-    return marks, A
+
+    B = []
+    for row in range(len(A)):
+        if marks[row] == False:
+            B.append(A[row])
+    return B
+
 
 def linear_algebra(Rels, P):
     """ 
@@ -618,8 +531,6 @@ def process_basis_vectors(N, basis, Rels, multiplier = 1):
     for K in basis:
         lhs = rhs = Ahs = 1
         I = [f for f, k in zip(Rels, K) if k == 1]
-        #print(I)
-        #sys.exit(0)
         if len(I) > 0:
             for i in I:
                 lhs *= i[1] # left-hand side
@@ -679,13 +590,11 @@ def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys_ABC=[]):
     It searchs for distinct needed polys congruent to n. 
     """
     n = min_search
-    cpolys = 0
+    cpolys = 1
     polys = []
-    #polys_ABC = []
     early_factors = []
     while cpolys <= needed:
         pol = Poly(N, Prime_base, x_max, search = n, verbose=False)
-        #print(pol.early_factors)
         if len(pol.early_factors) > 0:
             for early_factor in pol.early_factors:
                 if early_factor not in early_factors:
@@ -756,15 +665,20 @@ def _MPQS(N, verbose=True, M = 1):
     """ 
     Main MPQS function. 
     """
+    if is_prime(N):
+        return [N]
+
     bN, lN = int(log2(N)), len(str(N))
-    i2N = isqrt(N) 
+    i2N = isqrt(N)
+
+    if pow(i2N,2) == N:
+        return [i2N, i2N]
+
     i2Np1 = i2N + 1 
     root_2n = isqrt(2*N)
     Rels = []
 
     T = cpu_count()
-
-    #B1 = pow(int(log10(pow(N, 6))),2) 
     B2, _ , B1 = prebuilt_params(log2(N))
     Prime_base, log_p = find_primebase(N, B2)
     B1 //= M
@@ -777,7 +691,6 @@ def _MPQS(N, verbose=True, M = 1):
     multiplier = choose_multiplier(N, Prime_base)
     Nm = multiplier * N
     
-    #x_max = B2 *60  # size of the sieve
     x_max = B1
     m_val = (x_max * root_2n) >> 1
     thresh = log10(m_val) * 0.735
@@ -793,37 +706,28 @@ def _MPQS(N, verbose=True, M = 1):
     start = 0
     stop = B1 # range to sieve
 
-    #polys, early_factors = generate_polys(Nm, Prime_base, x_max, T) # generate n distinct polys one for each cpu core.
-    #if len(early_factors) > 0:
-    #    tmp = 1
-    #    small = []
-    #    for early_factor in early_factors:
-    #        g = gcd(early_factor, N)    
-    #        if N > g > 1: 
-    #            tmp *= g
-    #            small.append(g)
-    #    if tmp > 1:
-    #        return small + MPQS(N // tmp)
-    
     manager = Manager()
     Rels = manager.list() # placeholder list for relations shareable between child processes.
     cycleFactors = manager.list()
 
     merged_count = manager.Value("i", 0)
+    tasks = manager.Value("i", 0)
 
     min_search = 0
     polys_ABC = []
 
     while True:
         # trim primes, recalc min
+        min_log_primes = [log(p) for p in Prime_base if p <= min_prime]
         Prime_base = [p for p in Prime_base if p > min_prime]
+        log_primes = [log(p) for p in Prime_base]
         smooth_base = prod(Prime_base)
         min_prime, thresh, fudge = recalculate_min_prime_thresh(thresh, Prime_base, log_p)
 
         t1 = time.time()
         sys.stderr.write("Data collection with %d threads...\n" % T)
   
-        polys, polys_ABC, early_factors = generate_polys(Nm, Prime_base, x_max, T, min_search, polys_ABC) # generate n distinct polys one for each cpu core.
+        polys, polys_ABC, early_factors = generate_polys(Nm, Prime_base, x_max, T * 2, min_search, polys_ABC) # generate n distinct polys one for each cpu core.
         if len(early_factors) > 0:
             tmp = 1
             small = []
@@ -836,12 +740,11 @@ def _MPQS(N, verbose=True, M = 1):
                 return small + MPQS(N // tmp)
 
         inputs = [] 
+        taskid = 1
         # generate tasks parameters
         for poly in polys:
-            #print(poly.sums)
-            #calc_sums
-            inputs += [(Nm, start, stop, Prime_base, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, poly)]
-        #sys.exit(0)
+            inputs += [(taskid, Nm, start, stop, Prime_base, min_log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, poly)]
+            taskid += 1
 
         # deploy tasks to every cpu core.
         pols = []
@@ -902,7 +805,12 @@ if __name__ == "__main__":
     N = Integer(sys.argv[1])
     ts = time.time()
     r = MPQS(N)
-    print(r)
+    Fp = trial_division(N,sorted(r))[0] 
+    tmp = []
+    for f,p in Fp:
+        tmp += ["%d ^ %d" % (f,p)]
+    msg = "The factorization for N = %d is: %s" % (N," * ".join(tmp))
+    print(msg.replace(" ^ 1",""))
     td = time.time() - ts
     tds = humanfriendly.format_timespan(td) 
     sys.stderr.write("All done in: %s.\n" % (tds))
