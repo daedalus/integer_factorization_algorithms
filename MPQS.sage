@@ -364,6 +364,10 @@ def is_power(n, minprimes):
 
 
 def is_power_logprime(n, min_log_primes):
+    """
+    Given the precomputed logs of a set of primes 
+    we can test if a number n is a perfect power of that prime.
+    """
     ispow = False
     for p in min_log_primes:
         a = log(n) / p
@@ -403,12 +407,12 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
             proc += 1 
             f = minifactor4(y, P, smooth_base)
             if f != None:            
-                if f[1] == 1:   
+                if f[1] == 1:  # found a relation 
                     filtered = filter_out_even_powers(f[0])
                     rel = [filtered, y, Rad, A] 
                     #print(rel)
                     Rels.append(rel)
-                elif f[1] in partials:
+                elif f[1] in partials: # found a partial and try to merge
                     a = partials[f[1]]
                     p = filter_out_even_powers(f[0] + a[0])
                     Ahs = A*a[3]
@@ -419,7 +423,7 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
                     if N > g > 1:
                         cycleFactors.append([g , N // g])
                         sys.stderr.write("Found cycle with partial\n")
-                    else:
+                    else: # didnt merge so store the partial for later merging
                         Rels.append([p, rhs, lhs, Ahs])
                     #with merged_count.value.get_lock():
                     merged_count.value += 1
