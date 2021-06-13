@@ -176,7 +176,7 @@ def trial_division(n, P):
                 while r % p == 0:
                     pw += 1
                     r //= p
-               a.append((int(p),int(pw)))
+                a.append((int(p),int(pw)))
         else:
             break
     return a,r,n
@@ -260,9 +260,11 @@ class Poly:
         self.x_max = x_max
         self.search = search
         self.verbose = verbose
+        self.counter = 0
         self.early_factors = []
         self.create()
         self.solve_for_x()
+ 
  
     def create(self):
         """ 
@@ -313,18 +315,15 @@ class Poly:
 
     def solve_for_x(self):
         """ 
-        Get the mininmum x value of the polynomial where y=f(x) is a guaranteed relation. 
+        Get the minima of the polynomial where y=f(x) is a guaranteed relation. 
         Code borrowed https://github.com/cramppet/quadratic-sieve/blob/master/QS.py
         """        
         A = self.A
         B = self.B
         C = self.C
         n = self.n
-        start_vals = []
-        #for p in self.P:
         p = self.root_A
         g = 1
-        #for p in self.P:
         while g == 1:
             p = next_prime(p)
             ainv = 1
@@ -349,7 +348,14 @@ class Poly:
         Ax = A * x
         Rad = Ax + B 
         return (Rad + B) * x + C, Rad # same as (Ax + 2B)x + C
-        
+      
+    def __repr__():
+        """
+        Return the string representation of the constructed polynomial
+        """
+        m = "F(X) = %d X ^ 2 + %d X + %d with minima: %d" % (self.A, self.B, self.C, self.minima) 
+        m = m.replace("+ -","- ")
+        return m
 
 def is_power(n, minprimes):
     ispow = False
@@ -397,6 +403,7 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
     msg = ""
     partials = {}
     i= 0
+    rels_found = 0
     for i in range(ld):
         if len(Rels) > required_relations or len(cycleFactors) > 0:
             break
@@ -408,6 +415,7 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
             f = minifactor4(y, P, smooth_base)
             if f != None:            
                 if f[1] == 1:  # found a relation 
+                    rels_found += 1
                     filtered = filter_out_even_powers(f[0])
                     rel = [filtered, y, Rad, A] 
                     #print(rel)
@@ -433,6 +441,7 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
             noproc += 1
 
         if i % m == 0:
+            poly.counter = rels_found
             lRels = len(Rels)
             lt = time.time()
             td = lt - ltd
@@ -451,6 +460,7 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
             msg = msg % (pid, start, i, ld, lRels, required_relations, merged_count.value, proc, noproc , tds, etas, tasks.value)
             sys.stderr.write(msg)
     
+    poly.counter = rels_found
     td = time.time() - st
     tds = humanfriendly.format_timespan(td)
     msg = "[%d] relations_find: Ended range(%d, %d, %d), found: %d of %d, merged: %d, proc: %d, noproc: %d, time elapsed: %s, alive tasks: %d.\n" 
@@ -594,13 +604,19 @@ def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys_ABC=[]):
         else:
             pol_ABC = (pol.A,pol.B,pol.C)
             if pol_ABC not in polys_ABC:
-                m = "Found poly: f(x) = %dx^2 + %dx + %d\n" % (pol_ABC)
-                sys.stderr.write(m.replace("+ -","- "))
+                #m = "Found poly: f(x) = %d X ^ 2 + %d X + %d, minima: %d\n" % (pol_ABC[0], pol_ABC[1], pol_ABC[2], pol.minima)
+                m = repr(pol) 
+                sys.stderr.write(m)
                 polys_ABC.append(pol_ABC)
                 polys.append(pol)
                 cpolys += 1
         n += 1
     return polys, polys_ABC, early_factors
+
+
+def poly_stats(polys):
+    for poly in polys:
+        sys.stderr.write("For poly: %s the count is: %d\n" % (repr(poly),poly.count))
 
 
 def prebuilt_params(bits):
@@ -709,6 +725,8 @@ def _MPQS(N, verbose=True, M = 1):
 
     min_poly_search = 0
     polys_ABC = []
+    last_lRels = 0
+    force_new_polys = False
 
     while True:
         # trim primes, recalc min
@@ -721,9 +739,12 @@ def _MPQS(N, verbose=True, M = 1):
         t1 = time.time()
         sys.stderr.write("Data collection with %d threads...\n" % T)
 
-        need_more_polys = (len(Rels) == 0) # if we havent still got any relation we need another set of polys.
+        lRels = len(Rels)
+        need_more_polys = not (lRels > last_lRels) or force_new_polys
+        last_lRels = lRels
 
-        if need_more_polys == True:  
+        if need_more_polys == True: 
+            sys.stderr.write("Need more polys...") 
             polys, polys_ABC, early_factors = generate_polys(Nm, Prime_base, x_max, T * 2, min_poly_search, polys_ABC) # generate n distinct polys one for each cpu core.
             if len(early_factors) > 0:
                 tmp = 1
