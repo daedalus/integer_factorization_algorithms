@@ -23,6 +23,56 @@ from itertools import repeat
 import humanfriendly
 
 
+def prebuilt_params(bits):
+    """
+    Bounds estimation
+    borrowed from msieve/mpqs.c
+    """
+    if bits <= 64:
+        return [100, 40, 1 * 65536]
+    if bits <= 128: 
+        return [450, 40, 1 * 65536]
+    if bits <= 183:
+        return [2000, 40, 1 * 65536]
+    if bits <= 200: 
+        return [3000, 50, 1 * 65536]
+    if bits <= 212: 
+        return [5400, 50, 3 * 65536]
+    if bits <= 233:
+        return [10000, 100, 3 * 65536]
+    if bits <= 249:
+        return [27000, 100, 3 * 65536]
+    if bits <= 266:
+        return [50000, 100, 3 * 65536]
+    if bits <= 283:
+        return [55000, 80, 3 * 65536]
+    if bits <= 298:
+        return [60000, 80, 9 * 65536]
+    if bits <= 315:
+        return [80000, 150, 9 * 65536]
+    if bits <= 332:
+        return [100000, 150, 9 * 65536]
+    if bits <= 348:
+        return [140000, 150, 9 * 65536]
+    if bits <= 363:
+        return [210000, 150, 13 * 65536]
+    if bits <= 379:
+        return [300000, 150, 17 * 65536]
+    if bits <= 395:
+        return [400000, 150, 21 * 65536]
+    if bits <= 415:
+        return [500000, 150, 25 * 65536] # beyond this point you're crazy 
+    if bits <= 440:
+        return [700000, 150, 33 * 65536]
+    if bits <= 465:
+        return [900000, 150, 50 * 65536]
+    if bits <= 490:
+        return [1100000, 150, 75 * 65536]
+    if bits <= 512:
+        return [1300000, 150, 100 * 65536]
+    return [1300000, 150, 100 * 65536]
+
+
 def choose_multiplier(n, prime_list):
     """
     Code borrowed from msieve/mpqs.c
@@ -152,16 +202,6 @@ def mod_sqrt(n, p):
         return a  # p == 2
 
 
-def is_power_logprime(n, min_log_primes):
-    ispow = False
-    for p in min_log_primes:
-        a = log(n) / p
-        b = int(a)
-        if a == b:
-            iwpow = True
-    return ispow
-
-
 def trial_division(n, P):
     """ 
     A simple trial division, factors are given by P-list. 
@@ -184,6 +224,9 @@ def trial_division(n, P):
 
 
 def merge_powers(ppws):
+    """
+    Merge powers such that: (a^b) * (a^c) == a^(b+c)
+    """
     d = {}
     for p,pw in ppws:
         if p not in d:
@@ -198,7 +241,7 @@ def merge_powers(ppws):
 
 def filter_out_even_powers(ppws):
     """ 
-    Filter out even powers. 
+    Same as merge but Filter out even powers. 
     """
     d = {}
     for p,pw in ppws:
@@ -231,6 +274,35 @@ def is_smooth(x, P):
         while y % p ==0:
             y //= p
     return abs(y) == 1 
+
+
+def is_power(n, primes):
+    """
+    Given a interger n and a set of primes it checks if n is a perfect power.
+    """
+    ispow = False
+    c = 0
+    for p in primes:
+        a = log(n) / log(p)
+        b = int(a)
+        if a == b:
+            ispow = True
+            c = b
+    return ispow
+
+
+def is_power_logprime(n, log_primes):
+    """
+    Given the precomputed logs of a set of primes 
+    we can test if a number n is a perfect power of that prime.
+    """
+    ispow = False
+    for p in log_primes:
+        a = log(n) / p
+        b = int(a)
+        if a == b:
+            iwpow = True
+    return ispow
 
 
 def minifactor4(x, P, smooth_base):
@@ -361,42 +433,22 @@ class Poly:
 
 
     def __hash__(self):
+        """
+        Hashes unique values of the polynomial to construct an python internal id.
+        """
         h = hash("%d-%d-%d" % (self.A,self.B,self.C))
         #print("hash: %s" % h)
         return h
 
 
     def __eq__(self, other):
+        """
+        Internal python facility needed to check if two polynomials are the same.
+        """
         if isinstance(other, Poly):
             return ((self.A == other.A) and (self.B == other.B) and (self.C == other.C))
         else:
             return NotImplemented
-
-
-def is_power(n, minprimes):
-    ispow = False
-    c = 0
-    for p in minprimes:
-        a = log(n) / log(p)
-        b = int(a)
-        if a == b:
-            ispow = True
-            c = b
-    return ispow
-
-
-def is_power_logprime(n, min_log_primes):
-    """
-    Given the precomputed logs of a set of primes 
-    we can test if a number n is a perfect power of that prime.
-    """
-    ispow = False
-    for p in min_log_primes:
-        a = log(n) / p
-        b = int(a)
-        if a == b:
-            iwpow = True
-    return ispow
 
 
 def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly = None):
@@ -625,62 +677,14 @@ def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys=[]):
     return polys, early_factors
 
 
-
 def poly_stats(polys, polycounts):
+    """
+    Prints polynomials relations stats
+    """
     for poly in polys:
         if poly in polycounts:
             poly_count = polycounts[poly]
-            sys.stderr.write("For poly: %s the count is: %d\n" % (repr(poly),poly_count))
-
-
-def prebuilt_params(bits):
-    """
-    Bounds estimation
-    borrowed from msieve/mpqs.c
-    """
-    if bits <= 64:
-        return [100, 40, 1 * 65536]
-    if bits <= 128: 
-        return [450, 40, 1 * 65536]
-    if bits <= 183:
-        return [2000, 40, 1 * 65536]
-    if bits <= 200: 
-        return [3000, 50, 1 * 65536]
-    if bits <= 212: 
-        return [5400, 50, 3 * 65536]
-    if bits <= 233:
-        return [10000, 100, 3 * 65536]
-    if bits <= 249:
-        return [27000, 100, 3 * 65536]
-    if bits <= 266:
-        return [50000, 100, 3 * 65536]
-    if bits <= 283:
-        return [55000, 80, 3 * 65536]
-    if bits <= 298:
-        return [60000, 80, 9 * 65536]
-    if bits <= 315:
-        return [80000, 150, 9 * 65536]
-    if bits <= 332:
-        return [100000, 150, 9 * 65536]
-    if bits <= 348:
-        return [140000, 150, 9 * 65536]
-    if bits <= 363:
-        return [210000, 150, 13 * 65536]
-    if bits <= 379:
-        return [300000, 150, 17 * 65536]
-    if bits <= 395:
-        return [400000, 150, 21 * 65536]
-    if bits <= 415:
-        return [500000, 150, 25 * 65536] # beyond this point you're crazy 
-    if bits <= 440:
-        return [700000, 150, 33 * 65536]
-    if bits <= 465:
-        return [900000, 150, 50 * 65536]
-    if bits <= 490:
-        return [1100000, 150, 75 * 65536]
-    if bits <= 512:
-        return [1300000, 150, 100 * 65536]
-    return [1300000, 150, 100 * 65536]
+            sys.stderr.write("For polynomial: %s the relations count is: %d\n" % (repr(poly),poly_count))
 
 
 def _MPQS(N, verbose=True, M = 1):
