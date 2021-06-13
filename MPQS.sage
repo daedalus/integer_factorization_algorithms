@@ -115,6 +115,7 @@ def choose_multiplier(n, prime_list):
             best_mult = mult_list[i]
     return best_mult;
 
+
 def mod_sqrt(n, p):
     """ 
     Tonelli shanks algorithm 
@@ -349,6 +350,7 @@ class Poly:
         Rad = Ax + B 
         return (Rad + B) * x + C, Rad # same as (Ax + 2B)x + C
       
+
     def __repr__(self):
         """
         Return the string representation of the constructed polynomial
@@ -357,16 +359,19 @@ class Poly:
         m = m.replace("+ -","- ")
         return m
 
+
     def __hash__(self):
         h = hash("%d-%d-%d" % (self.A,self.B,self.C))
         #print("hash: %s" % h)
         return h
+
 
     def __eq__(self, other):
         if isinstance(other, Poly):
             return ((self.A == other.A) and (self.B == other.B) and (self.C == other.C))
         else:
             return NotImplemented
+
 
 def is_power(n, minprimes):
     ispow = False
@@ -429,7 +434,6 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
                     rels_found += 1
                     filtered = filter_out_even_powers(f[0])
                     rel = [filtered, y, Rad, A] 
-                    #print(rel)
                     Rels.append(rel)
                 elif f[1] in partials: # found a partial and try to merge
                     a = partials[f[1]]
@@ -453,8 +457,6 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
             noproc += 1
 
         if i % m == 0:
-            #print(repr(poly))
-            #poly.counter = rels_found
             polycounts[poly] = rels_found
             lRels = len(Rels)
             lt = time.time()
@@ -462,7 +464,6 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
             ltd = lt
             if i > 0:
                 if lRels > 0:
-                    #eta = td * (((ld / m) + (required_relations / lRels)) / 2)
                     eta = int(td * sqrt((ld / m)**2 + (required_relations / lRels)**2))
                 else:
                     eta = int(td * (ld / m))
@@ -481,7 +482,6 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
     msg = msg % (pid, start,i,ld,len(Rels),required_relations, merged_count.value, proc, noproc, tds, tasks.value)
     sys.stderr.write(msg)
     tasks.value -= 1
-    #Rels += Found_Rels
     return Found_Rels
     
 
@@ -515,6 +515,7 @@ def Gaussian_elimination_GF2(A):
               A[i][k] = (A[i][j] ^ A[i][k]) 
           break
   return marks, A
+
 
 def left_nullspace(A):
     """
@@ -601,15 +602,12 @@ def recalculate_min_prime_thresh(thresh, Prime_base, log_p):
     return min_prime, thresh, fudge
 
 
-#def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys_ABC=[]):
 def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys=[]):
-
     """ 
     It searchs for distinct needed polys congruent to n. 
     """
     n = min_search
     cpolys = 0
-    #polys = []
     early_factors = []
     while cpolys <= needed:
         pol = Poly(N, Prime_base, x_max, search = n, verbose=False)
@@ -618,17 +616,12 @@ def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys=[]):
                 if early_factor not in early_factors:
                     early_factors.append(early_factor)
         else:
-            #pol_ABC = (pol.A,pol.B,pol.C)
-            #if pol_ABC not in polys_ABC:
             if pol not in polys:
-                #m = "Found poly: f(x) = %d X ^ 2 + %d X + %d, minima: %d\n" % (pol_ABC[0], pol_ABC[1], pol_ABC[2], pol.minima)
                 m = repr(pol) 
                 sys.stderr.write("New Poly %d: %s\n" % (cpolys,m))
-                #polys_ABC.append(pol_ABC)
                 polys.append(pol)
                 cpolys += 1
         n += 1
-    #return polys, polys_ABC, early_factors
     return polys, early_factors
 
 
@@ -721,13 +714,10 @@ def _MPQS(N, verbose=True, M = 1):
     multiplier = choose_multiplier(N, Prime_base)
     Nm = multiplier * N
     
-    #x_max = B2 *60  # size of the sieve
     x_max = B1
     m_val = (x_max * root_2n) >> 1
     thresh = log10(m_val) * 0.735
     min_prime = int(thresh * 3)
-    
-
 
     sys.stderr.write("Factoring N: %d, bits: %d, digits: %d, B1: %d, B2: %d\n" % (N,bN,lN,B1,B2))
     sys.stderr.write("Multiplier is: %d\n" % multiplier)
@@ -744,7 +734,6 @@ def _MPQS(N, verbose=True, M = 1):
     tasks = manager.Value("i", 0)
 
     min_poly_search = 0
-    #polys_ABC = []
     polys = []
 
     last_lRels = 0
@@ -772,7 +761,6 @@ def _MPQS(N, verbose=True, M = 1):
 
         if need_more_polys == True: 
             sys.stderr.write("Need more polys...\n") 
-            #polys, polys_ABC, early_factors = generate_polys(Nm, Prime_base, x_max, T * 2, min_poly_search, polys_ABC) # generate n distinct polys one for each cpu core.
             polys, early_factors = generate_polys(Nm, Prime_base, x_max, T * 2, min_poly_search, polys) # generate n distinct polys one for each cpu core.
 
             if len(early_factors) > 0:
@@ -790,17 +778,12 @@ def _MPQS(N, verbose=True, M = 1):
         taskid = 1
         # generate tasks parameters
         for poly in polys[0 - (T * 2):len(polys)]:
-            #print(poly.sums)
-            #calc_sums
             inputs += [(taskid, Nm, start, stop, Prime_base, min_log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly)]
             taskid += 1
-        #sys.exit(0)
 
         # deploy tasks to every cpu core.
         pols = []
         workpool = Pool(T)
-        #print(T,len(inputs))
-        #sys.exit(0)
         with workpool:
             R = workpool.starmap(relations_find, inputs)  
         workpool.close()
