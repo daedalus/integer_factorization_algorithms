@@ -260,7 +260,7 @@ class Poly:
         self.x_max = x_max
         self.search = search
         self.verbose = verbose
-        self.counter = 0
+        #self.counter = 0
         self.early_factors = []
         self.create()
         self.solve_for_x()
@@ -349,13 +349,24 @@ class Poly:
         Rad = Ax + B 
         return (Rad + B) * x + C, Rad # same as (Ax + 2B)x + C
       
-    def __repr__():
+    def __repr__(self):
         """
         Return the string representation of the constructed polynomial
         """
         m = "F(X) = %d X ^ 2 + %d X + %d with minima: %d" % (self.A, self.B, self.C, self.minima) 
         m = m.replace("+ -","- ")
         return m
+
+    def __hash__(self):
+        h = hash("%d-%d-%d" % (self.A,self.B,self.C))
+        #print("hash: %s" % h)
+        return h
+
+    def __eq__(self, other):
+        if isinstance(other, Poly):
+            return ((self.A == other.A) and (self.B == other.B) and (self.C == other.C))
+        else:
+            return NotImplemented
 
 def is_power(n, minprimes):
     ispow = False
@@ -383,7 +394,7 @@ def is_power_logprime(n, min_log_primes):
     return ispow
 
 
-def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, poly = None):
+def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly = None):
     """ 
     Relations search funcion 
     """
@@ -433,6 +444,7 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
                         sys.stderr.write("Found cycle with partial\n")
                     else: # didnt merge so store the partial for later merging
                         Rels.append([p, rhs, lhs, Ahs])
+                        rels_found += 1
                     #with merged_count.value.get_lock():
                     merged_count.value += 1
                 else:
@@ -441,7 +453,9 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
             noproc += 1
 
         if i % m == 0:
-            poly.counter = rels_found
+            #print(repr(poly))
+            #poly.counter = rels_found
+            polycounts[poly] = rels_found
             lRels = len(Rels)
             lt = time.time()
             td = lt - ltd
@@ -460,7 +474,7 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
             msg = msg % (pid, start, i, ld, lRels, required_relations, merged_count.value, proc, noproc , tds, etas, tasks.value)
             sys.stderr.write(msg)
     
-    poly.counter = rels_found
+    polycounts[poly] = rels_found
     td = time.time() - st
     tds = humanfriendly.format_timespan(td)
     msg = "[%d] relations_find: Ended range(%d, %d, %d), found: %d of %d, merged: %d, proc: %d, noproc: %d, time elapsed: %s, alive tasks: %d.\n" 
@@ -587,13 +601,15 @@ def recalculate_min_prime_thresh(thresh, Prime_base, log_p):
     return min_prime, thresh, fudge
 
 
-def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys_ABC=[]):
+#def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys_ABC=[]):
+def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys=[]):
+
     """ 
     It searchs for distinct needed polys congruent to n. 
     """
     n = min_search
-    cpolys = 1
-    polys = []
+    cpolys = 0
+    #polys = []
     early_factors = []
     while cpolys <= needed:
         pol = Poly(N, Prime_base, x_max, search = n, verbose=False)
@@ -602,21 +618,26 @@ def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys_ABC=[]):
                 if early_factor not in early_factors:
                     early_factors.append(early_factor)
         else:
-            pol_ABC = (pol.A,pol.B,pol.C)
-            if pol_ABC not in polys_ABC:
+            #pol_ABC = (pol.A,pol.B,pol.C)
+            #if pol_ABC not in polys_ABC:
+            if pol not in polys:
                 #m = "Found poly: f(x) = %d X ^ 2 + %d X + %d, minima: %d\n" % (pol_ABC[0], pol_ABC[1], pol_ABC[2], pol.minima)
                 m = repr(pol) 
-                sys.stderr.write(m)
-                polys_ABC.append(pol_ABC)
+                sys.stderr.write("New Poly %d: %s\n" % (cpolys,m))
+                #polys_ABC.append(pol_ABC)
                 polys.append(pol)
                 cpolys += 1
         n += 1
-    return polys, polys_ABC, early_factors
+    #return polys, polys_ABC, early_factors
+    return polys, early_factors
 
 
-def poly_stats(polys):
+
+def poly_stats(polys, polycounts):
     for poly in polys:
-        sys.stderr.write("For poly: %s the count is: %d\n" % (repr(poly),poly.count))
+        if poly in polycounts:
+            poly_count = polycounts[poly]
+            sys.stderr.write("For poly: %s the count is: %d\n" % (repr(poly),poly_count))
 
 
 def prebuilt_params(bits):
@@ -706,12 +727,10 @@ def _MPQS(N, verbose=True, M = 1):
     thresh = log10(m_val) * 0.735
     min_prime = int(thresh * 3)
     
-    required_relations_ratio = 1.05
-    required_relations = round(len(Prime_base) * required_relations_ratio) 
+
 
     sys.stderr.write("Factoring N: %d, bits: %d, digits: %d, B1: %d, B2: %d\n" % (N,bN,lN,B1,B2))
     sys.stderr.write("Multiplier is: %d\n" % multiplier)
-    sys.stderr.write("Need %d relations\n" % (required_relations))
 
     start = 0
     stop = B1 # range to sieve
@@ -719,17 +738,25 @@ def _MPQS(N, verbose=True, M = 1):
     manager = Manager()
     Rels = manager.list() # placeholder list for relations shareable between child processes.
     cycleFactors = manager.list()
+    polycounts = manager.dict()
 
     merged_count = manager.Value("i", 0)
     tasks = manager.Value("i", 0)
 
     min_poly_search = 0
-    polys_ABC = []
+    #polys_ABC = []
+    polys = []
+
     last_lRels = 0
     force_new_polys = False
 
+    required_relations_ratio = 1.05
+    required_relations = len(Prime_base)
+
     while True:
         # trim primes, recalc min
+        required_relations = int(required_relations * required_relations_ratio)
+        sys.stderr.write("Need %d relations\n" % (required_relations))
         min_log_primes = [log(p) for p in Prime_base if p <= min_prime]
         Prime_base = [p for p in Prime_base if p > min_prime]
         log_primes = [log(p) for p in Prime_base]
@@ -744,8 +771,10 @@ def _MPQS(N, verbose=True, M = 1):
         last_lRels = lRels
 
         if need_more_polys == True: 
-            sys.stderr.write("Need more polys...") 
-            polys, polys_ABC, early_factors = generate_polys(Nm, Prime_base, x_max, T * 2, min_poly_search, polys_ABC) # generate n distinct polys one for each cpu core.
+            sys.stderr.write("Need more polys...\n") 
+            #polys, polys_ABC, early_factors = generate_polys(Nm, Prime_base, x_max, T * 2, min_poly_search, polys_ABC) # generate n distinct polys one for each cpu core.
+            polys, early_factors = generate_polys(Nm, Prime_base, x_max, T * 2, min_poly_search, polys) # generate n distinct polys one for each cpu core.
+
             if len(early_factors) > 0:
                 tmp = 1
                 small = []
@@ -763,9 +792,9 @@ def _MPQS(N, verbose=True, M = 1):
         for poly in polys[0 - (T * 2):len(polys)]:
             #print(poly.sums)
             #calc_sums
-            inputs += [(taskid, Nm, start, stop, Prime_base, min_log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, poly)]
-        #sys.exit(0)
+            inputs += [(taskid, Nm, start, stop, Prime_base, min_log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly)]
             taskid += 1
+        #sys.exit(0)
 
         # deploy tasks to every cpu core.
         pols = []
@@ -797,7 +826,9 @@ def _MPQS(N, verbose=True, M = 1):
             result = process_basis_vectors(Nm, basis, Rels, multiplier)
             t4 = time.time()
             sys.stderr.write("Done in: %f secs.\n" % (t4-t3))
-            
+             
+            poly_stats(polys, polycounts)
+
             if result != None:
                 return result, len(polys)
 
