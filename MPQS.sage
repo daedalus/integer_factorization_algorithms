@@ -23,6 +23,7 @@ from itertools import repeat
 import humanfriendly
 from copy import *
 
+
 def prebuilt_params(bits):
     """
     Bounds estimation
@@ -238,6 +239,7 @@ def merge_powers(ppws):
        tmp2.append((p,d[p]))
     return tmp2
 
+
 def filter_out_even_powers(ppws):
     """ 
     Same as merge but Filter out even powers. 
@@ -447,6 +449,7 @@ class Poly:
         m = m.replace("+ -","- ")
         return m
 
+
     def __add__(self, other):
         """
         Adds one polynomial to other
@@ -457,6 +460,7 @@ class Poly:
                 return Poly(self.n, self.x_max, search = None, A = A, B = B, C = C)
         else:
             return NotImplemented
+
 
     def __sub__(self, other):
         """
@@ -469,6 +473,7 @@ class Poly:
         else:
             return NotImplemented
 
+
     def __mul__(self, other):
         """
         Scalar multiply: scalar*(F(x))
@@ -478,6 +483,7 @@ class Poly:
             return Poly(self.n, self.x_max, search = None, A = A, B = B, C = C)
         else:
             return NotImplemented
+
 
     def __hash__(self):
         """
@@ -498,7 +504,22 @@ class Poly:
             return NotImplemented
 
 
-def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly = None):
+def compute_logs_y_sums(start, stop, P, log_primes):
+     """
+     Compute log table
+     """
+     logs_y = [0] * ((stop - start) + 1)
+     for j in range(len(P)):
+         p = P[j]
+         log_p = log_primes[j]
+         #for i in range(start + m, stop + m, p):
+         #    logs_y[i - m] += log_p
+         for i in range(start , stop , p):
+             logs_y[i] += log_p
+     return logs_y
+
+
+def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, logs_y, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly = None):
     """ 
     Relations search funcion 
     """
@@ -512,18 +533,6 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, smooth
 
     ld = len(Diffs)
     pre_log_filter = True
-    if pre_log_filter:
-        """
-        In theory this should make computations faster as we skeep to factor y=f(x) that does not shield any useful relation,
-        but in the practice is not working.
-        """
-        logs_y = [0] * (stop - start) * 2
-        for j in range(len(P)):
-            p = P[j]
-            log_p = log_primes[j]
-            for i in range(start + m , stop + m, p):
-                logs_y[i - m] += log_p
-        sys.stderr.write("[%d] relations_find: range(%d, %d), interval: %d log_filtering ended\n" % (pid,start, stop, (stop-start)))    
 
     proc = noproc = 0
     Found_Rels = []
@@ -544,7 +553,9 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, smooth
         y = abs(y)
 
         if pre_log_filter:
-           candidate = (0 < logs_y[i - m] <= thresh and not is_prime(y))
+           #x = i
+           #print(x)
+           candidate = (0 < logs_y[i] <= thresh and not is_prime(y))
            a, b, c = is_square(y), is_prime(y), is_power_logprime(y, min_log_primes)
         else:
            candidate = (y > P[0] and not is_prime(y) and not is_square(y) and not is_power_logprime(y, min_log_primes))
@@ -754,13 +765,14 @@ def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys=[]):
                 if early_factor not in early_factors:
                     early_factors.append(early_factor)
         else:
-            if pol not in polys:
+            if pol not in polys and pol.minima > 0:
                 m = repr(pol) 
                 sys.stderr.write("New Poly %d: %s\n" % (cpolys,m))
                 polys.append(pol)
                 cpolys += 1
         n += 1
     return polys, early_factors
+
 
 def getbestpolys(polys, polycounts, T):
     """
@@ -784,6 +796,7 @@ def getbestpolys(polys, polycounts, T):
         new_polys.append(poly)
     return new_polys
 
+
 def poly_stats(polys, polycounts):
     """
     Prints polynomials relations stats
@@ -794,7 +807,7 @@ def poly_stats(polys, polycounts):
             sys.stderr.write("For polynomial: %s the relations count is: %d\n" % (repr(poly),poly_count))
 
 
-def _MPQS(N, verbose=True, M = 1):
+def _MPQS(N, verbose=True, M = 2):
     """ 
     Main MPQS function. 
     """
@@ -840,6 +853,7 @@ def _MPQS(N, verbose=True, M = 1):
     
     manager = Manager()
     Rels = manager.list() # placeholder list for relations shareable between child processes.
+    newlist = manager.list()
     cycleFactors = manager.list()
     polycounts = manager.dict()
 
@@ -855,13 +869,23 @@ def _MPQS(N, verbose=True, M = 1):
     required_relations_ratio = 1.05
     required_relations = len(Prime_base)
 
+    logs_y = []
+
     while True:
         # trim primes, recalc min
-        required_relations = int(required_relations * required_relations_ratio)
-        sys.stderr.write("Need %d relations\n" % (required_relations))
+
+        sys.stderr.write("Generating primebase and logprime table...\n")
         min_log_primes = [log(p) for p in Prime_base if p <= min_prime]
         filtered_Prime_base = [p for p in Prime_base if p > min_prime]
         log_primes = [log(p) for p in Prime_base]
+        filtered_log_primes = [log(p) for p in filtered_Prime_base]
+      
+        if (stop-start) > len(logs_y):
+            logs_y = compute_logs_y_sums(0, stop-start, filtered_Prime_base, filtered_log_primes)
+
+        required_relations = int(required_relations * required_relations_ratio)
+        sys.stderr.write("Need %d relations\n" % (required_relations))
+        
         smooth_base = prod(Prime_base)
         min_prime, thresh, fudge = recalculate_min_prime_thresh(thresh, filtered_Prime_base, log_p)
 
@@ -887,15 +911,16 @@ def _MPQS(N, verbose=True, M = 1):
                 if tmp > 1:
                     return small + MPQS(N // tmp), 0
              
+        logs_y = compute_logs_y_sums(0, (stop-start), filtered_Prime_base, filtered_log_primes)
+
         inputs = [] 
         taskid = 1
         #polys += [Poly(N, Prime_base, x_max, search = None, verbose=False, A=1, B=0, C=-N)] # lower shield base poly for QS.
 
         # generate tasks parameters
-        #polys = getbestpolys(polys, polycounts, T)
         for poly in polys[0 - (T * M):len(polys)]:
         #for poly in polys:
-            inputs += [(taskid, Nm, start, stop, filtered_Prime_base, min_log_primes, log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly)]
+            inputs += [(taskid, Nm, start, stop, filtered_Prime_base, min_log_primes, log_primes, logs_y, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly)]
             taskid += 1
 
         # deploy tasks to every cpu core.
@@ -909,17 +934,12 @@ def _MPQS(N, verbose=True, M = 1):
         t2 = time.time()
         sys.stderr.write("Done in: %f secs.\n" % (t2-t1))
         sys.stderr.write("Found %d rels with %d base primes.\n" % (len(Rels),len(Prime_base)))
-        #sys.stderr.write("Found %d rels with %d base primes.\n Sorting..." % (len(Rels),len(Prime_base)))
-
 
         if len(cycleFactors) > 0:
             return cycleFactors, len(polys)
 
-        #Rels = list(set(Rels))
         t3 = time.time()
-        #sys.stderr.write("Done in: %f secs.\n" % (t3-t2))
 
-        
         # when needed relations is reached proceed to do linear algebra
         if len(Rels) > required_relations:
             sys.stderr.write("Found %d enough relations of %d needed relations...\n" % (len(Rels),required_relations))
@@ -943,7 +963,7 @@ def _MPQS(N, verbose=True, M = 1):
             start = stop
             stop += B1
         else:
-            min_poly_search += (T * 2)
+            min_poly_search += T
 
         sys.stderr.write("Need to sieve %d differences more...\nNew sieving range %d:%d\n" % (required_relations - len(Rels),start,stop))
       
