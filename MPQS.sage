@@ -21,7 +21,7 @@ from sage.parallel.multiprocessing_sage import parallel_iter
 from multiprocessing import cpu_count, Pool, Manager
 from itertools import repeat
 import humanfriendly
-
+from copy import *
 
 def prebuilt_params(bits):
     """
@@ -238,7 +238,6 @@ def merge_powers(ppws):
        tmp2.append((p,d[p]))
     return tmp2
 
-
 def filter_out_even_powers(ppws):
     """ 
     Same as merge but Filter out even powers. 
@@ -326,7 +325,7 @@ class Poly:
     Quadratic polynomial helper class: 
     type Ax + 2Bx + C 
     """
-    def __init__(self, n, P, x_max, search = 0, verbose = None, logp = None):
+    def __init__(self, n, P, x_max, search = 0, verbose = None, logp = None, A = None, B = None, C = None):
         self.n = int(n)
         self.P = P
         self.logp = logp
@@ -335,7 +334,18 @@ class Poly:
         self.verbose = verbose
         #self.counter = 0
         self.early_factors = []
-        self.create()
+
+        if A == None and B == None and C == None:
+            self.create()
+        else:
+            print("given poly parameters: %d %d %d" % (A,B,C))
+            self.A = A
+            self.B = B
+            self.C = C
+            root_2n = isqrt(2 * self.n)
+            root_A = next_prime(isqrt(root_2n // x_max))
+            self.root_A = root_A
+
         self.solve_for_x()
  
  
@@ -396,19 +406,24 @@ class Poly:
         C = self.C
         n = self.n
         p = self.root_A
-        g = 1
-        while g == 1:
-            p = next_prime(p)
-            ainv = 1
-            if A != 1:
-                g, inv, _ = gcdext(A, p)
-                if g != 1:
-                    r1 = mod_sqrt(C, p)
-                    r2 = (-1 * r1) % p
-                    start1 = (ainv * (r1 - B)) % p
-                    start2 = (ainv * (r2 - B)) % p
-                    self.X = [int(start1), int(start2)]
-                    self.minima = sum(self.X)//2
+        if A > 1:
+            g = 1
+            while g == 1:
+                p = next_prime(p)
+                ainv = 1
+                if A != 1:
+                    g, inv, _ = gcdext(A, p)
+                    if g != 1:
+                        r1 = mod_sqrt(C, p)
+                        r2 = (-1 * r1) % p
+                        start1 = (ainv * (r1 - B)) % p
+                        start2 = (ainv * (r2 - B)) % p
+                        self.X = [int(start1), int(start2)]
+                        self.minima = sum(self.X)//2
+        elif A == 1:
+            i = isqrt(abs(C))
+            self.X = [-i,i]
+            self.minima = 0
 
 
     def eval(self, x):
@@ -420,7 +435,8 @@ class Poly:
         C = self.C
         Ax = A * x
         Rad = Ax + B 
-        return (Rad + B) * x + C, Rad # same as (Ax + 2B)x + C
+        y = (Rad + B) * x + C
+        return y, Rad, x # same as (Ax + 2B)x + C
       
 
     def __repr__(self):
@@ -431,6 +447,37 @@ class Poly:
         m = m.replace("+ -","- ")
         return m
 
+    def __add__(self, other):
+        """
+        Adds one polynomial to other
+        """
+        if isinstance(other, Poly):
+            if self.n == other.n and self.x_max == olther.x_max:
+                A, B, C = self.A + other.A, self.B + other.B, self.C + other.C
+                return Poly(self.n, self.x_max, search = None, A = A, B = B, C = C)
+        else:
+            return NotImplemented
+
+    def __sub__(self, other):
+        """
+        Substracts one polynomial to other
+        """
+        if isinstance(other, Poly):
+            if self.n == other.n and self.x_max == olther.x_max:
+                A, B, C = self.A - other.A, self.B - other.B, self.C - other.C
+                return Poly(self.n, self.x_max, search = None, A = A, B = B, C = C)
+        else:
+            return NotImplemented
+
+    def __mul__(self, other):
+        """
+        Scalar multiply: scalar*(F(x))
+        """
+        if isinstance(other, int):
+            A, B, C = self.A * other, self.B * other, self.C * other
+            return Poly(self.n, self.x_max, search = None, A = A, B = B, C = C)
+        else:
+            return NotImplemented
 
     def __hash__(self):
         """
@@ -451,22 +498,39 @@ class Poly:
             return NotImplemented
 
 
-def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly = None):
+def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly = None):
     """ 
     Relations search funcion 
     """
     #pid = os.getpid()
     pid = taskid
     tasks.value += 1
-    sys.stderr.write("[%d] relations_find: range(%d, %d), interval: %d sieving start\n" % (pid,start, stop, (stop-start)))
+    sys.stderr.write("[%d] relations_find: range(%d, %d), interval: %d sieving start, tresh: %f.\n" % (pid,start, stop, (stop-start), thresh))
     m = poly.minima
-    Diffs = [(poly.eval(abs(x)),abs(x)) for x in range(start + m, stop +m)]
+    Diffs = [poly.eval(abs(x)) for x in range(start + m, stop +m)]
+    
+
+    ld = len(Diffs)
+    pre_log_filter = True
+    if pre_log_filter:
+        """
+        In theory this should make computations faster as we skeep to factor y=f(x) that does not shield any useful relation,
+        but in the practice is not working.
+        """
+        logs_y = [0] * (stop - start) * 2
+        for j in range(len(P)):
+            p = P[j]
+            log_p = log_primes[j]
+            for i in range(start + m , stop + m, p):
+                logs_y[i - m] += log_p
+        sys.stderr.write("[%d] relations_find: range(%d, %d), interval: %d log_filtering ended\n" % (pid,start, stop, (stop-start)))    
+
     proc = noproc = 0
     Found_Rels = []
     A = poly.A
     st = time.time()
     ltd = st
-    ld = len(Diffs)
+
     m = 1000
     msg = ""
     partials = {}
@@ -474,12 +538,19 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
     rels_found = 0
     for i in range(ld):
         if len(Rels) > required_relations or len(cycleFactors) > 0:
+            polycounts[poly] = rels_found
             break
-        yRad, x = Diffs[i]
-        y, Rad = yRad
+        y, Rad, x = Diffs[i]
         y = abs(y)
-        if y > P[0] and not is_prime(y) and not is_square(y) and not is_power_logprime(y, min_log_primes):
-            proc += 1 
+
+        if pre_log_filter:
+           candidate = (0 < logs_y[i - m] <= thresh and not is_prime(y))
+           a, b, c = is_square(y), is_prime(y), is_power_logprime(y, min_log_primes)
+        else:
+           candidate = (y > P[0] and not is_prime(y) and not is_square(y) and not is_power_logprime(y, min_log_primes))
+
+        if candidate:
+            proc += 1
             f = minifactor4(y, P, smooth_base)
             if f != None:            
                 if f[1] == 1:  # found a relation 
@@ -509,7 +580,6 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, smooth_base, Rels,
             noproc += 1
 
         if i % m == 0:
-            polycounts[poly] = rels_found
             lRels = len(Rels)
             lt = time.time()
             td = lt - ltd
@@ -564,9 +634,25 @@ def Gaussian_elimination_GF2(A):
           marks[i] = True
           for k in range(j+1,m):
             if A[i][k] == 1:
-              A[i][k] = (A[i][j] ^ A[i][k]) 
+              A[i][k] = (A[i][j] + A[i][k]) % 2 
           break
   return marks, A
+
+
+def create_matrix(Rels, P):
+    """
+    Create a matrix with the relations.
+    """
+    M1 = []
+    for i in range(0,len(Rels)):
+        row = []
+        for j in range(0,len(P)): 
+            if P[j] in Rels[i][0]:
+                row.append(1)
+            else:
+                row.append(0)
+        M1.append(row)
+    return M1
 
 
 def left_nullspace(A):
@@ -579,9 +665,9 @@ def left_nullspace(A):
     #marks, A = gauss(A)
 
     B = []
-    for row in range(len(A)):
-        if marks[row] == False:
-            B.append(A[row])
+    for row_index in range(0,len(A)):
+        if marks[row_index] == False:
+            B.append(A[row_index])
     return B
 
 
@@ -676,6 +762,27 @@ def generate_polys(N, Prime_base, x_max, needed, min_search = 0, polys=[]):
         n += 1
     return polys, early_factors
 
+def getbestpolys(polys, polycounts, T):
+    """
+    Experimental function, break things.
+    """
+    tmp_polys = copy(polys)
+    new_polys = []
+    print("have polys: %d" % len(tmp_polys))
+    print(polys)
+    while len(new_polys) < T:
+        max_poly_count = 0
+        for i in range(0,len(tmp_polys)):
+            poly = tmp_polys[i]
+            if poly in polycounts:
+                poly_count = polycounts[poly]
+                if poly_count > max_poly_count:
+                    max_poly_count = poly_count
+                    best_poly = poly
+                    del polys[i]
+        print("new best poly: %s" % repr(poly))
+        new_polys.append(poly)
+    return new_polys
 
 def poly_stats(polys, polycounts):
     """
@@ -692,19 +799,20 @@ def _MPQS(N, verbose=True, M = 1):
     Main MPQS function. 
     """
     if is_prime(N):
-        return [N]
+        return [N], 0 
 
     bN, lN = int(log2(N)), len(str(N))
     i2N = isqrt(N)
 
     if pow(i2N,2) == N:
-        return [i2N, i2N]
+        return [i2N, i2N],0
 
     i2Np1 = i2N + 1 
     root_2n = isqrt(2*N)
     Rels = []
 
     T = cpu_count()
+    T *= M
 
     B2, _ , B1 = prebuilt_params(log2(N))
     Prime_base, log_p = find_primebase(N, B2)
@@ -713,7 +821,8 @@ def _MPQS(N, verbose=True, M = 1):
   
     if B2 == 1:
         sys.stderr.write("Found small factor: %d\n" % Prime_base[0])
-        return Prime_base + _MPQS(N // Prime_base[0]), 0
+        r, polycount = _MPQS(N // Prime_base[0])
+        return Prime_base + r, polycount
 
     multiplier = choose_multiplier(N, Prime_base)
     Nm = multiplier * N
@@ -751,10 +860,10 @@ def _MPQS(N, verbose=True, M = 1):
         required_relations = int(required_relations * required_relations_ratio)
         sys.stderr.write("Need %d relations\n" % (required_relations))
         min_log_primes = [log(p) for p in Prime_base if p <= min_prime]
-        Prime_base = [p for p in Prime_base if p > min_prime]
+        filtered_Prime_base = [p for p in Prime_base if p > min_prime]
         log_primes = [log(p) for p in Prime_base]
         smooth_base = prod(Prime_base)
-        min_prime, thresh, fudge = recalculate_min_prime_thresh(thresh, Prime_base, log_p)
+        min_prime, thresh, fudge = recalculate_min_prime_thresh(thresh, filtered_Prime_base, log_p)
 
         t1 = time.time()
         sys.stderr.write("Data collection with %d threads...\n" % T)
@@ -765,7 +874,7 @@ def _MPQS(N, verbose=True, M = 1):
 
         if need_more_polys == True: 
             sys.stderr.write("Need more polys...\n") 
-            polys, early_factors = generate_polys(Nm, Prime_base, x_max, T * 2, min_poly_search, polys) # generate n distinct polys one for each cpu core.
+            polys, early_factors = generate_polys(Nm, Prime_base, x_max, T, min_poly_search, polys) # generate n distinct polys one for each cpu core.
 
             if len(early_factors) > 0:
                 tmp = 1
@@ -780,9 +889,13 @@ def _MPQS(N, verbose=True, M = 1):
              
         inputs = [] 
         taskid = 1
+        #polys += [Poly(N, Prime_base, x_max, search = None, verbose=False, A=1, B=0, C=-N)] # lower shield base poly for QS.
+
         # generate tasks parameters
-        for poly in polys[0 - (T * 2):len(polys)]:
-            inputs += [(taskid, Nm, start, stop, Prime_base, min_log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly)]
+        #polys = getbestpolys(polys, polycounts, T)
+        for poly in polys[0 - (T * M):len(polys)]:
+        #for poly in polys:
+            inputs += [(taskid, Nm, start, stop, filtered_Prime_base, min_log_primes, log_primes, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly)]
             taskid += 1
 
         # deploy tasks to every cpu core.
@@ -796,10 +909,17 @@ def _MPQS(N, verbose=True, M = 1):
         t2 = time.time()
         sys.stderr.write("Done in: %f secs.\n" % (t2-t1))
         sys.stderr.write("Found %d rels with %d base primes.\n" % (len(Rels),len(Prime_base)))
+        #sys.stderr.write("Found %d rels with %d base primes.\n Sorting..." % (len(Rels),len(Prime_base)))
+
 
         if len(cycleFactors) > 0:
-            return cycleFactors
+            return cycleFactors, len(polys)
 
+        #Rels = list(set(Rels))
+        t3 = time.time()
+        #sys.stderr.write("Done in: %f secs.\n" % (t3-t2))
+
+        
         # when needed relations is reached proceed to do linear algebra
         if len(Rels) > required_relations:
             sys.stderr.write("Found %d enough relations of %d needed relations...\n" % (len(Rels),required_relations))
@@ -807,12 +927,12 @@ def _MPQS(N, verbose=True, M = 1):
             
             basis = linear_algebra(Rels, Prime_base) # calculate left nullspace of a GF(2) matrix.
 
-            t3 = time.time()
-            sys.stderr.write("Done in: %f secs.\n" % (t3-t2))
-            sys.stderr.write("Matrix reduction...\n")
-            result = process_basis_vectors(Nm, basis, Rels, multiplier)
             t4 = time.time()
             sys.stderr.write("Done in: %f secs.\n" % (t4-t3))
+            sys.stderr.write("Matrix reduction...")
+            result = process_basis_vectors(Nm, basis, Rels, multiplier)
+            t5 = time.time()
+            sys.stderr.write("Done in: %f secs.\n" % (t5-t4))
              
             poly_stats(polys, polycounts)
 
