@@ -504,17 +504,15 @@ class Poly:
             return NotImplemented
 
 
-def compute_logs_y_sums(start, stop, P, log_primes):
+def compute_logs_y_sums(l, P, log_primes):
      """
      Compute log table
      """
-     logs_y = [0] * ((stop - start) + 1)
+     logs_y = [0] * (l + 1)
      for j in range(len(P)):
          p = P[j]
          log_p = log_primes[j]
-         #for i in range(start + m, stop + m, p):
-         #    logs_y[i - m] += log_p
-         for i in range(start , stop , p):
+         for i in range(0, l, p):
              logs_y[i] += log_p
      return logs_y
 
@@ -553,10 +551,7 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, logs_y
         y = abs(y)
 
         if pre_log_filter:
-           #x = i
-           #print(x)
            candidate = (0 < logs_y[i] <= thresh and not is_prime(y))
-           a, b, c = is_square(y), is_prime(y), is_power_logprime(y, min_log_primes)
         else:
            candidate = (y > P[0] and not is_prime(y) and not is_square(y) and not is_power_logprime(y, min_log_primes))
 
@@ -881,7 +876,7 @@ def _MPQS(N, verbose=True, M = 2):
         filtered_log_primes = [log(p) for p in filtered_Prime_base]
       
         if (stop-start) > len(logs_y):
-            logs_y = compute_logs_y_sums(0, stop-start, filtered_Prime_base, filtered_log_primes)
+            logs_y = compute_logs_y_sums((stop-start), filtered_Prime_base, filtered_log_primes)
 
         required_relations = int(required_relations * required_relations_ratio)
         sys.stderr.write("Need %d relations\n" % (required_relations))
