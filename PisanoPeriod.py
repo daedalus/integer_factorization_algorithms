@@ -74,7 +74,7 @@ class Fibonacci:
         if self.verbose:    
             print('Search begin: %d, end: %d'%(begin, end))
         
-        if self.multitasked:
+        if self.multitasked and search_len > 1000:
             C = cpu_count() * 2
             search_work = search_len // C
 
