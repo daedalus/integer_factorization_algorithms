@@ -7,20 +7,17 @@ White paper: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8901977
 
 import random
 import time
-from gmpy2 import sqrt,isqrt, gcd, fib, fib2, f_mod as mod, powmod, is_prime, get_context, log2, log10
+from gmpy2 import *
 import sys
 sys.setrecursionlimit(5000)
+from multiprocessing import Pool, cpu_count, Manager
 
-ctx = get_context()
-ctx.precision += 1000
-sqrt5 = sqrt(5)
-
-import bitarray
 
 class Fibonacci:
-    def __init__(self):
-        pass
-    
+    def __init__(self, progress = False, verbose = True, multitasked = True):
+        self.progress = progress
+        self.verbose = verbose
+        self.multitasked = multitasked
 
     def _fib_res(self,n,p):
         """ fibonacci sequence nth item modulo p """
@@ -34,57 +31,37 @@ class Fibonacci:
                 return (c, d)
             else:
                 return (d, mod((c + d), p))
-    
-    def _fib_eig(self,n,p):
-        lambda1 = (1 + sqrt5) / 2
-        lambda2 = (1 - sqrt5) / 2
-        fk = (pow(lambda1, n) - pow(lambda2, n)) / (lambda1 - lambda2)
-        return mod(int(fk), p)
 
 
-    def get_n_mod_d(self,n,d, use='mersenne'):
-    #def get_n_mod_d(self,n,d, use=''):
+    def get_n_mod_d(self,n,d, use = 'mersenne'):
         if n < 0:
             ValueError("Negative arguments not implemented")
         if use == 'gmpy':
             return mod(fib(n), d)
-        elif use == 'eig':
-            return self._fib_eig(n,d) # takes forever
         elif use == 'mersenne':
-            return mod(powmod(2,n, d)-1, d)
+            return powmod(2, n, d) - 1
         else:
             return self._fib_res(n,d)[0]
 
+    def ranged_period(self, N, start, stop, look_up_dest):
+        print("ranged_period (%d,%d) start" % (start,stop))
+        tmp_look_up = {}
+        for x in range(start, stop):
+            tmp_look_up[self.get_n_mod_d(x, N)] = x
+        look_up_dest.update(tmp_look_up)
+        #look_up_dest |= tmp_look_up
+        print("ranged_period (%d,%d) end" % (start,stop))
+        return 1
     
-    def binary_search(self,L,n):
-        """ Finds item index in O(log2(N)) """ 
-        left = 0
-        right = len(L) - 1
-        while left <= right:
-            mid=(left + right) >> 1
-            if n == L[mid]:
-                return mid
-            elif n < L[mid]:
-                right = mid - 1
-            else:
-                left = mid + 1
-        return -1
-    
-    
-    def sort_list(self,L):
-        from operator import itemgetter
-        indices, L_sorted = zip(*sorted(enumerate(L), key=itemgetter(1)))
-        return list(L_sorted),list(indices)
-   
- 
-    def get_period_bigint(self, N, min_accept, xdiff, verbose = False, use_qbf = False):            
+
+    def get_period_bigint(self, N, min_accept, xdiff, verbose = False):            
         search_len = int(pow(N, (1.0 / 6) / 100))
         
         if search_len < min_accept:
             search_len = min_accept
   
-        if verbose:
-            print('search_len:%d'%(search_len))
+        if self.verbose:
+            print('Search_len: %d, log2(N): %d' % (search_len,int(log2(N))))
         
         starttime = time.time()
         diff = xdiff 
@@ -94,61 +71,72 @@ class Fibonacci:
             begin = 1
         end = N + int('9' * p_len)
     
-        if verbose:    
-            print('search begin:%d,end:%d'%(begin, end))
-               
-        rs = [self.get_n_mod_d(x, N) for x in range(search_len)]
-        rs_sort, rs_indices = self.sort_list(rs)
+        if self.verbose:    
+            print('Search begin: %d, end: %d'%(begin, end))
+        
+        if self.multitasked:
+            C = cpu_count() * 2
+            search_work = search_len // C
 
-        if use_qbf:
-            QBF = bitarray.bitarray(rs_sort[-1]+1) 
-            QBF.setall(0)
+            manager =  Manager()
+            look_up = manager.dict()
 
-            for index in rs_sort:
-                QBF[index] = 1
+            if self.verbose:
+                print("Precompute LUT with %d tasks..." % C)
 
-        if verbose:    
-            #print(rs, rs_sort, rs_indices)        
-            print('sort complete! time used: %f secs' % (time.time() - starttime))
-                
-        T = 0
-        has_checked_list = []
+            inputs = []
+            for x in range(0, search_len, search_work):
+                inputs += [(N, x, x + search_work, look_up)]
+
+            workpool = Pool(C)
+
+            with workpool:
+                results = workpool.starmap(self.ranged_period,inputs)
+                print(results)
+                workpool.close()
+                workpool.join()
+
+        else:
+            look_up = {}
+            self.ranged_period(N, 0, search_len, look_up)
+
+        if self.verbose:
+            print("LUT creation ended size: %d..." % len(look_up))
+            print("Searching...")
+        
 
         while True:       
             randi = random.randint(begin,end)            
-            if (not randi in has_checked_list):
-                has_checked_list.append(randi)
-            
-                res = self.get_n_mod_d(randi, N)
-             
-                if use_qbf: 
-                    if res < len(QBF) and QBF[res] == 1:
-                        inx = self.binary_search(rs_sort, res)
-                        print("res:",res,"inx:",inx)
-                    else:
-                        inx = -1
-                else:
-                    inx = self.binary_search(rs_sort, res)
-                                    
-                if inx > -1:                
-                    res_n = rs_indices[inx]
-                    T = randi - res_n
-                     
-                    if self.get_n_mod_d(T, N) == 0:
-                        td = int(time.time() - starttime)
-                        if verbose:
-                            print('For N = %d Found T:%d, randi: %d, time used %f secs.' % (N , T, randi, td))
-                        return td, T, randi
-                    else:
-                        if verbose:
-                            print('For N = %d\n Found res: %d, inx: %d, res_n: %d , T: %d\n but failed!' % (N, res, inx, res_n, T))
+            res = self.get_n_mod_d(randi, N)
+            if res > 0:
+                #print(res, res in look_up)
+                if res in look_up:
+                    res_n = look_up[res]
+                    T = randi - res_n   
+                    if T & 1 == 0: 
+                        if self.get_n_mod_d(T, N) == 0:
+                            td = int(time.time() - starttime)
+                            if self.verbose:
+                                print('For N = %d Found T:%d, randi: %d, time used %f secs.' % (N , T, randi, td))
+                            return td, T, randi
+                        else:
+                            if self.verbose:
+                                print('For N = %d\n Found res: %d, res_n: %d , T: %d\n but failed!' % (N, res, res_n, T))
+            else:
+                if randi & 1 == 0:
+                    T = randi
+                    td = int(time.time() - starttime)
+                    if self.verbose:
+                        print('First shot, For N = %d Found T:%d, randi: %d, time used %f secs.' % (N , T, randi, td))
+                    return td, T, randi
 
   
-    def _trivial_factorization_with_n_phi(self, N, phi):
+    def _trivial_factorization_with_n_phi(self, N, T):
+        phi = abs(N - T) + 1
         p1 = []
         d2 = N << 2
 
-        phi2 = pow(phi,2)
+        phi2 = pow(phi, 2)
         phi2p4d = phi2 + d2
         phi2m4d = phi2 - d2
 
@@ -181,8 +169,7 @@ class Fibonacci:
     def factorization(self, N, min_accept, xdiff):
         res = self.get_period_bigint(N, min_accept, xdiff, verbose=True) 
         if res != None:
-            t, T, r = res
-            phi = abs(N - T) + 1
+            t, phi, r = res 
             return self._trivial_factorization_with_n_phi(N, phi)
 
 """
@@ -228,9 +215,11 @@ def test(Ns,B2=0):
     n = 1
     tti = time.time()
     for N in Ns:
+        if int(log2(N)) < 38:
+            continue
         ti = time.time()
-        B1, B2 = pow(10, int((log10(N)) // 2)-1), B2
-        print("Test: %d, N: %d, log2(N): %d, B1: %d, B2: %d" % (n, N,log2(N),B1,B2))
+        B1, B2 = pow(10, int((log10(N)) // 2)-0), B2
+        print("Test: %d, N: %d, log2(N): %d, B1: %d, B2: %d" % (n, N,int(log2(N)),B1,B2))
         P = Fib.factorization(N,B1,B2)
         if P != None:
             phi = (P[0]-1) * (P[1]-1)
@@ -255,7 +244,7 @@ def test2():
   for B1 in B1s:
       for B2 in B2s:
           ti = time.time()
-          print("Test: %d, N: %d, log2(N): %d, B1: %d, B2: %d" % (n, N,log2(N),B1,B2))
+          print("Test: %d, N: %d, log2(N): %d, B1: %d, B2: %d" % (n, N,int(log2(N)),B1,B2))
           P = Fib.factorization(N,B1,B2)
           if P != None:
               phi = (P[0]-1) * (P[1]-1)
@@ -273,14 +262,48 @@ def test3(N, B2 = 0):
   Fib = Fibonacci()
   ti = time.time()
   B1, B2 = pow(10, int((log10(N)) // 2)), B2
-  print("Test: N: %d, log2(N): %d, B1: %d, B2: %d" % (N,log2(N),B1,B2))
+  print("Test: N: %d, log2(N): %d, B1: %d, B2: %d" % (N,int(log2(N)),B1,B2))
   P = Fib.factorization(N,B1,B2)
   print(P)
   td = time.time() - ti
   print("Runtime: %f" % (td))
 
+def test4(l,B2=0):
+    Fib = Fibonacci(multitasked = True)
+    #times = []
+    ff = 0
+    n = 1
+    tti = time.time()
+    for n in range(10,l):
+        ti = time.time()
+        n2 = 2**(n//2)
+        n21 = (2**(n//2)-1)
+        a = random.randint(n21,n2)
+        p = next_prime(a)
+        q = p
+        while q == p:
+           b = random.randint(n21,n2)
+           q = next_prime(next_prime(b))
+        N = p * q
+        B1, B2 = pow(10, int((log10(N)) // 2)-0), B2
+        print("Test: %d, N: %d, log2(N): %d, B1: %d, B2: %d" % (n, N,int(log2(N)),B1,B2))
+        P = Fib.factorization(N,B1,B2)
+        if P != None:
+            phi = (P[0]-1) * (P[1]-1)
+            print("phi(N): %d" % phi)
+            print("factors: %s" % str(P))
+            ff += 1
+        td = time.time() - ti
+        ttd = time.time() - tti
+        print("Runtime: %f\nFully factored:%d of %d" % (td,ff,l))
+        print("Total Runtime: %f" % (ttd))
+        n += 1
+        print('------------------------------------------------------------------')
+
+
 
 if __name__=='__main__':
-   test(Ns0+Ns1+Ns2,B2=int(sys.argv[1]))
+   #test(Ns0+Ns1+Ns2,B2=int(sys.argv[1]))
    #test2()
    #test3(int(sys.argv[1]))
+   test4(100)
