@@ -504,17 +504,32 @@ class Poly:
             return NotImplemented
 
 
-def compute_logs_y_sums(l, P, log_primes):
+def compute_logs_y_sums(start, stop, P, log_primes, last_logp_table = []):
      """
      Compute log table
      """
-     logs_y = [0] * (l + 1)
+     logs_y = copy(last_logp_table)
+     logs_y += [0] * (stop-start)
      for j in range(len(P)):
          p = P[j]
          log_p = log_primes[j]
-         for i in range(0, l, p):
-             logs_y[i] += log_p
+         for i in range(0 , stop , p):
+             if i >= start:
+                 logs_y[i] += log_p
      return logs_y
+
+
+def logptable(start, stop, primes, logp, last_logp_table = []):
+    logp_table = copy(last_logp_table)
+    logp_table += [0] * (stop-start)
+    for j in range(0,len(primes)):
+        p = primes[j]
+        log_p = logp[j]
+        for i in range(0, stop, p):
+            if i >= start:
+                logp_table[i] += log_p
+    return logp_table
+
 
 
 def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, logs_y, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly = None):
@@ -551,7 +566,10 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, logs_y
         y = abs(y)
 
         if pre_log_filter:
+           #x = i
+           #print(x)
            candidate = (0 < logs_y[i] <= thresh and not is_prime(y))
+           a, b, c = is_square(y), is_prime(y), is_power_logprime(y, min_log_primes)
         else:
            candidate = (y > P[0] and not is_prime(y) and not is_square(y) and not is_power_logprime(y, min_log_primes))
 
@@ -802,6 +820,18 @@ def poly_stats(polys, polycounts):
             sys.stderr.write("For polynomial: %s the relations count is: %d\n" % (repr(poly),poly_count))
 
 
+def unique(List, newlist):
+    """
+    Creates a unique list of elements
+    """
+    for element in List:
+        if element not in tmp:
+            newlist.append(element)
+        else:
+            print("repeated")
+    return newlist
+    
+
 def _MPQS(N, verbose=True, M = 2):
     """ 
     Main MPQS function. 
@@ -823,22 +853,24 @@ def _MPQS(N, verbose=True, M = 2):
     T *= M
 
     B2, _ , B1 = prebuilt_params(log2(N))
-    Prime_base, log_p = find_primebase(N, B2)
-    #B1 //= M
-    B2 = len(Prime_base)
-  
-    if B2 == 1:
-        sys.stderr.write("Found small factor: %d\n" % Prime_base[0])
-        r, polycount = _MPQS(N // Prime_base[0])
-        return Prime_base + r, polycount
-
-    multiplier = choose_multiplier(N, Prime_base)
-    Nm = multiplier * N
     
     x_max = B1
     m_val = (x_max * root_2n) >> 1
     thresh = log10(m_val) * 0.735
     min_prime = int(thresh * 3)
+
+    Prime_base, log_p = find_primebase(N, B2 + min_prime)
+    
+    #print(B2,len(Prime_base), min_prime)
+    #sys.exit(0)
+
+    multiplier = choose_multiplier(N, Prime_base)
+    Nm = multiplier * N
+
+    if B2 == 1:
+        sys.stderr.write("Found small factor: %d\n" % Prime_base[0])
+        r, polycount = _MPQS(N // Prime_base[0])
+        return Prime_base + r, polycount
 
     sys.stderr.write("Factoring N: %d, bits: %d, digits: %d, B1: %d, B2: %d\n" % (N,bN,lN,B1,B2))
     sys.stderr.write("Multiplier is: %d\n" % multiplier)
@@ -859,7 +891,7 @@ def _MPQS(N, verbose=True, M = 2):
     polys = []
 
     last_lRels = 0
-    force_new_polys = False
+    force_new_polys = True
 
     required_relations_ratio = 1.05
     required_relations = len(Prime_base)
@@ -875,8 +907,8 @@ def _MPQS(N, verbose=True, M = 2):
         log_primes = [log(p) for p in Prime_base]
         filtered_log_primes = [log(p) for p in filtered_Prime_base]
       
-        if (stop-start) > len(logs_y):
-            logs_y = compute_logs_y_sums((stop-start), filtered_Prime_base, filtered_log_primes)
+        if stop > len(logs_y):
+            logs_y = compute_logs_y_sums(start, stop, filtered_Prime_base, filtered_log_primes, logs_y)
 
         required_relations = int(required_relations * required_relations_ratio)
         sys.stderr.write("Need %d relations\n" % (required_relations))
@@ -888,7 +920,9 @@ def _MPQS(N, verbose=True, M = 2):
         sys.stderr.write("Data collection with %d threads...\n" % T)
 
         lRels = len(Rels)
+
         need_more_polys = not (lRels > last_lRels) or force_new_polys
+
         last_lRels = lRels
 
         if need_more_polys == True: 
@@ -913,10 +947,18 @@ def _MPQS(N, verbose=True, M = 2):
         #polys += [Poly(N, Prime_base, x_max, search = None, verbose=False, A=1, B=0, C=-N)] # lower shield base poly for QS.
 
         # generate tasks parameters
-        for poly in polys[0 - (T * M):len(polys)]:
+        if not need_more_polys:
+            sys.stderr.write("Using the best polys to get more relations...\n")
+            polys_new = getbestpolys(polys, polycounts, T)
+        else:
+            polys_new = polys[0 - (T * M):len(polys)]
+
+        for poly in polys_new:
         #for poly in polys:
             inputs += [(taskid, Nm, start, stop, filtered_Prime_base, min_log_primes, log_primes, logs_y, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly)]
             taskid += 1
+            if poly not in polys:
+                poly.append(poly) 
 
         # deploy tasks to every cpu core.
         pols = []
@@ -928,13 +970,21 @@ def _MPQS(N, verbose=True, M = 2):
         
         t2 = time.time()
         sys.stderr.write("Done in: %f secs.\n" % (t2-t1))
+        #sys.stderr.write("Found %d rels with %d base primes.\nSorting..." % (len(Rels),len(Prime_base)))
         sys.stderr.write("Found %d rels with %d base primes.\n" % (len(Rels),len(Prime_base)))
+
 
         if len(cycleFactors) > 0:
             return cycleFactors, len(polys)
 
+        #unique(Rels, newlist)
+        #Rels = newlist
+        
         t3 = time.time()
 
+        #sys.stderr.write("Done in: %f secs.\n" % (t3-t2))
+        #sys.stderr.write("Unique rels after sort: %d \n" % (len(Rels)))
+        
         # when needed relations is reached proceed to do linear algebra
         if len(Rels) > required_relations:
             sys.stderr.write("Found %d enough relations of %d needed relations...\n" % (len(Rels),required_relations))
