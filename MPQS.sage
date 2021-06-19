@@ -365,9 +365,6 @@ class Poly:
         s=0
         leg = 2
         while True:
-            root_A = next_prime(root_A + s)
-            #root_A = next_prime(root_A)
-
             leg = legendre(n, root_A)
             if leg == 1:
                 if s > self.search:
@@ -378,7 +375,7 @@ class Poly:
                     break
                 #break
             s += 1
-
+            root_A = next_prime(root_A + s)
         self.s = s
         A = int(pow(root_A, 2))
         # solve for an adequate B. B*B is a quadratic residue mod n,
@@ -532,102 +529,104 @@ def logptable(start, stop, primes, logp, last_logp_table = []):
 
 
 
-def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, logs_y, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly = None):
+def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, logs_y, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, polys = None):
     """ 
     Relations search funcion 
     """
     #pid = os.getpid()
     pid = taskid
     tasks.value += 1
-    sys.stderr.write("[%d] relations_find: range(%d, %d), interval: %d sieving start, tresh: %f.\n" % (pid,start, stop, (stop-start), thresh))
-    m = poly.minima
-    Diffs = [poly.eval(abs(x)) for x in range(start + m, stop +m)]
-    
-
-    ld = len(Diffs)
+    sys.stderr.write("[%d] relations_find: range(%d, %d), interval: %d sieving start, tresh: %f, pb: %d.\n" % (pid,start, stop, (stop-start), thresh,len(polys)))
     pre_log_filter = True
-
+    merge = True
     proc = noproc = 0
     Found_Rels = []
-    A = poly.A
     st = time.time()
     ltd = st
-
     m = 1000
     msg = ""
     partials = {}
-    i= 0
     rels_found = 0
-    for i in range(ld):
-        if len(Rels) > required_relations or len(cycleFactors) > 0:
-            polycounts[poly] = rels_found
-            break
-        y, Rad, x = Diffs[i]
-        y = abs(y)
 
-        if pre_log_filter:
-           #x = i
-           #print(x)
-           candidate = (0 < logs_y[i] <= thresh and not is_prime(y))
-           a, b, c = is_square(y), is_prime(y), is_power_logprime(y, min_log_primes)
-        else:
-           candidate = (y > P[0] and not is_prime(y) and not is_square(y) and not is_power_logprime(y, min_log_primes))
+    for poly in polys:
+        m = poly.minima
+        Diffs = [poly.eval(abs(x)) for x in range(start + m, stop +m)]
+        ld = len(Diffs)
+        A = poly.A
+        for i in range(ld):
+            if len(Rels) > required_relations or len(cycleFactors) > 0:
+                polycounts[poly] = (start,stop,rels_found)
+                break
+            y, Rad, x = Diffs[i]
+            y = abs(y)
 
-        if candidate:
-            proc += 1
-            f = minifactor4(y, P, smooth_base)
-            if f != None:            
-                if f[1] == 1:  # found a relation 
-                    rels_found += 1
-                    filtered = filter_out_even_powers(f[0])
-                    rel = [filtered, y, Rad, A] 
-                    Rels.append(rel)
-                elif f[1] in partials: # found a partial and try to merge
-                    a = partials[f[1]]
-                    p = filter_out_even_powers(f[0] + a[0])
-                    Ahs = A*a[3]
-                    lhs = Rad * a[2]
-                    rhs = y * a[1]
-                    LHS = Ahs + lhs
-                    g = gcd(isqrt(LHS) - rhs, N)
-                    if N > g > 1:
-                        cycleFactors.append([g , N // g])
-                        sys.stderr.write("Found cycle with partial\n")
-                    else: # didnt merge so store the partial for later merging
-                        Rels.append([p, rhs, lhs, Ahs])
-                        rels_found += 1
-                    #with merged_count.value.get_lock():
-                    merged_count.value += 1
-                else:
-                    partials[f[1]] = [f[0], y, Rad, A]
-        else:
-            noproc += 1
-
-        if i % m == 0:
-            lRels = len(Rels)
-            lt = time.time()
-            td = lt - ltd
-            ltd = lt
-            if i > 0:
-                if lRels > 0:
-                    eta = int(td * sqrt((ld / m)**2 + (required_relations / lRels)**2))
-                else:
-                    eta = int(td * (ld / m))
-                etas = humanfriendly.format_timespan(eta)
+            if pre_log_filter:
+                candidate = (0 < logs_y[i] <= thresh and not is_prime(y))
             else:
-                etas = "No ETA estimated"
-            tds = humanfriendly.format_timespan(td)
-            msg = "[%d] relations_find: range (%d, %d , %d), found: %d of %d, merged: %d, proc: %d, noproc: %d, iter_elapsed: %s, eta: %s, alive tasks: %d.\n" 
-            msg = msg % (pid, start, i, ld, lRels, required_relations, merged_count.value, proc, noproc , tds, etas, tasks.value)
-            sys.stderr.write(msg)
+                candidate = (y > P[0] and not is_prime(y) and not is_square(y) and not is_power_logprime(y, min_log_primes))
+
+            if candidate:
+                proc += 1
+                f = minifactor4(y, P, smooth_base)
+                if f != None:            
+                    if f[1] == 1:  # found a relation 
+                        rels_found += 1
+                        filtered = filter_out_even_powers(f[0])
+                        rel = [filtered, y, Rad, A] 
+                        Rels.append(rel)
+                    elif merge and (f[1] in partials): # found a partial and try to merge
+                        a = partials[f[1]]
+                        p = filter_out_even_powers(f[0] + a[0])
+                        Ahs = A*a[3]
+                        lhs = Rad * a[2]
+                        rhs = y * a[1]
+                        LHS = Ahs + lhs
+                        g = gcd(isqrt(LHS) - rhs, N)
+                        if N > g > 1:
+                            cycleFactors.append([g , N // g])
+                            sys.stderr.write("Found cycle with partial\n")
+                        else: # didnt merge so store the partial for later merging
+                            if merge:
+                                rel = [p, rhs, lhs, Ahs]
+                                if rel not in Rels:
+                                    Rels.append(rel)
+                                    rels_found += 1
+                                    #with merged_count.value.get_lock():
+                                    merged_count.value += 1
+                                    del partials[f[1]]
+                    else:
+                        if merge:
+                            partials[f[1]] = [f[0], y, Rad, A]
+            else:
+                noproc += 1
+
+            if i % m == 0:
+                lRels = len(Rels)
+                lt = time.time()
+                td = lt - ltd
+                ltd = lt
+                if i > 0:
+                    if lRels > 0:
+                        eta = int(td * sqrt((ld / m)**2 + (required_relations / lRels)**2))
+                    else:
+                        eta = int(td * (ld / m))
+                    etas = humanfriendly.format_timespan(eta)
+                else:
+                    etas = "No ETA estimated"
+                tds = humanfriendly.format_timespan(td)
+                msg = "[%d] relations_find: range (%d, %d , %d), found: %d of %d, merged: %d, proc: %d, noproc: %d, iter_elapsed: %s, eta: %s, alive tasks: %d.\n" 
+                msg = msg % (pid, start, i, ld, lRels, required_relations, merged_count.value, proc, noproc , tds, etas, tasks.value)
+                sys.stderr.write(msg)
     
-    polycounts[poly] = rels_found
+        polycounts[poly] = (start,stop,rels_found)
+
     td = time.time() - st
     tds = humanfriendly.format_timespan(td)
     msg = "[%d] relations_find: Ended range(%d, %d, %d), found: %d of %d, merged: %d, proc: %d, noproc: %d, time elapsed: %s, alive tasks: %d.\n" 
     msg = msg % (pid, start,i,ld,len(Rels),required_relations, merged_count.value, proc, noproc, tds, tasks.value)
     sys.stderr.write(msg)
     tasks.value -= 1
+
     return Found_Rels
     
 
@@ -736,6 +735,7 @@ def find_primebase(n, bound):
     https://github.com/elliptic-shiho/primefac-fork/blob/master/_primefac/_factor_algo/_mpqs.py
     Same as the sieve of erathostenes.
     """
+    print(n,bound)
     primes, mod_root, log_p, num_prime, p = [], {}, {}, 0, 3
     while num_prime <= bound:
         leg = legendre(n % p, p)
@@ -795,18 +795,27 @@ def getbestpolys(polys, polycounts, T):
     new_polys = []
     print("have polys: %d" % len(tmp_polys))
     print(polys)
+    j = -1
     while len(new_polys) < T:
         max_poly_count = 0
         for i in range(0,len(tmp_polys)):
             poly = tmp_polys[i]
             if poly in polycounts:
-                poly_count = polycounts[poly]
+                poly_count = polycounts[poly][2]
                 if poly_count > max_poly_count:
                     max_poly_count = poly_count
-                    best_poly = poly
-                    del polys[i]
-        print("new best poly: %s" % repr(poly))
-        new_polys.append(poly)
+                    best_poly = poly                
+                    j = i
+
+        #if -1 < j < len(tmp_polys):
+        if -1 < j < len(tmp_polys):
+            print("new best poly: %s, j: %d, len: %d, count: %d" % (repr(poly),j,len(tmp_polys),max_poly_count))
+            new_polys.append(best_poly)
+            del tmp_polys[j]
+        else:
+            print(tmp_polys)
+            break
+    sys.stderr.write("Requested best_polys: %d, got: %d\n" % (T,len(new_polys)))
     return new_polys
 
 
@@ -817,7 +826,7 @@ def poly_stats(polys, polycounts):
     for poly in polys:
         if poly in polycounts:
             poly_count = polycounts[poly]
-            sys.stderr.write("For polynomial: %s the relations count is: %d\n" % (repr(poly),poly_count))
+            sys.stderr.write("For polynomial: %s the relations count is: %s\n" % (repr(poly),poly_count))
 
 
 def unique(List, newlist):
@@ -832,7 +841,7 @@ def unique(List, newlist):
     return newlist
     
 
-def _MPQS(N, verbose=True, M = 2):
+def _MPQS(N, verbose=True, M = 5):
     """ 
     Main MPQS function. 
     """
@@ -849,8 +858,8 @@ def _MPQS(N, verbose=True, M = 2):
     root_2n = isqrt(2*N)
     Rels = []
 
-    T = cpu_count()
-    T *= M
+    T = cpu_count() * M
+    #T *= M
 
     B2, _ , B1 = prebuilt_params(log2(N))
     
@@ -860,14 +869,13 @@ def _MPQS(N, verbose=True, M = 2):
     min_prime = int(thresh * 3)
 
     Prime_base, log_p = find_primebase(N, B2 + min_prime)
-    
-    #print(B2,len(Prime_base), min_prime)
-    #sys.exit(0)
 
     multiplier = choose_multiplier(N, Prime_base)
     Nm = multiplier * N
+    
+    required_relations = len(Prime_base)
 
-    if B2 == 1:
+    if required_relations == 1:
         sys.stderr.write("Found small factor: %d\n" % Prime_base[0])
         r, polycount = _MPQS(N // Prime_base[0])
         return Prime_base + r, polycount
@@ -892,9 +900,10 @@ def _MPQS(N, verbose=True, M = 2):
 
     last_lRels = 0
     force_new_polys = True
+    use_best = True
 
     required_relations_ratio = 1.05
-    required_relations = len(Prime_base)
+    required_relations = int(required_relations * required_relations_ratio)
 
     logs_y = []
 
@@ -909,8 +918,8 @@ def _MPQS(N, verbose=True, M = 2):
       
         if stop > len(logs_y):
             logs_y = compute_logs_y_sums(start, stop, filtered_Prime_base, filtered_log_primes, logs_y)
+            required_relations = int(required_relations * required_relations_ratio)
 
-        required_relations = int(required_relations * required_relations_ratio)
         sys.stderr.write("Need %d relations\n" % (required_relations))
         
         smooth_base = prod(Prime_base)
@@ -922,43 +931,46 @@ def _MPQS(N, verbose=True, M = 2):
         lRels = len(Rels)
 
         need_more_polys = not (lRels > last_lRels) or force_new_polys
+        need_more_polys = False
 
         last_lRels = lRels
 
-        if need_more_polys == True: 
-            sys.stderr.write("Need more polys...\n") 
-            polys, early_factors = generate_polys(Nm, Prime_base, x_max, T, min_poly_search, polys) # generate n distinct polys one for each cpu core.
-
-            if len(early_factors) > 0:
-                tmp = 1
-                small = []
-                for early_factor in early_factors:
-                    g = gcd(early_factor, N)
-                    if N > g > 1:
-                        tmp *= g
-                        small.append(g)
-                if tmp > 1:
-                    return small + MPQS(N // tmp), 0
-             
-        logs_y = compute_logs_y_sums(0, (stop-start), filtered_Prime_base, filtered_log_primes)
-
         inputs = [] 
         taskid = 1
-        #polys += [Poly(N, Prime_base, x_max, search = None, verbose=False, A=1, B=0, C=-N)] # lower shield base poly for QS.
 
         # generate tasks parameters
         if not need_more_polys:
-            sys.stderr.write("Using the best polys to get more relations...\n")
-            polys_new = getbestpolys(polys, polycounts, T)
+            if len(polys) > 0 and use_best:
+                sys.stderr.write("Using the best polys to get more relations...\n")
+                polys_new = getbestpolys(polys, polycounts, T)
+                polys_new += polys[0 - T:len(polys)]
+            else:
+                #polys_new = generate_polys(Nm, Prime_base, x_max, T, min_poly_search, polys)
+                sys.stderr.write("Need more polys...\n")
+                polys_new, early_factors = generate_polys(Nm, Prime_base, x_max, T, min_poly_search, polys) # generate n distinct polys one for each cpu core.
+                if len(early_factors) > 0:
+                    tmp = 1
+                    small = []
+                    for early_factor in early_factors:
+                        g = gcd(early_factor, N)
+                        if N > g > 1:
+                            tmp *= g
+                            small.append(g)
+                    if tmp > 1:
+                        return small + MPQS(N // tmp), 0
+                min_poly_search += T
         else:
             polys_new = polys[0 - (T * M):len(polys)]
+            
+        pb = M
+        for i in range(0, len(polys_new), pb):
+            polys_batch = polys_new[i : i + pb]
 
-        for poly in polys_new:
-        #for poly in polys:
-            inputs += [(taskid, Nm, start, stop, filtered_Prime_base, min_log_primes, log_primes, logs_y, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, poly)]
+            inputs += [(taskid, Nm, start, stop, filtered_Prime_base, min_log_primes, log_primes, logs_y, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, polys_batch)]
             taskid += 1
-            if poly not in polys:
-                poly.append(poly) 
+            for poly in polys_batch:
+                if poly not in polys:
+                    poly.append(poly) 
 
         # deploy tasks to every cpu core.
         pols = []
@@ -977,9 +989,6 @@ def _MPQS(N, verbose=True, M = 2):
         if len(cycleFactors) > 0:
             return cycleFactors, len(polys)
 
-        #unique(Rels, newlist)
-        #Rels = newlist
-        
         t3 = time.time()
 
         #sys.stderr.write("Done in: %f secs.\n" % (t3-t2))
@@ -1017,7 +1026,6 @@ def MPQS(N):
     """ 
     Iterative version of MPQS. 
     """
-
     result, polys = _MPQS(N)
     polycount = polys
 
