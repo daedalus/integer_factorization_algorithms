@@ -516,19 +516,6 @@ def compute_logs_y_sums(start, stop, P, log_primes, last_logp_table = []):
      return logs_y
 
 
-def logptable(start, stop, primes, logp, last_logp_table = []):
-    logp_table = copy(last_logp_table)
-    logp_table += [0] * (stop-start)
-    for j in range(0,len(primes)):
-        p = primes[j]
-        log_p = logp[j]
-        for i in range(0, stop, p):
-            if i >= start:
-                logp_table[i] += log_p
-    return logp_table
-
-
-
 def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, logs_y, smooth_base, Rels, merged_count, required_relations, cycleFactors, thresh, tasks, polycounts, polys = None):
     """ 
     Relations search funcion 
