@@ -556,15 +556,16 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, logs_y
                 proc += 1
                 f = minifactor4(y, P, smooth_base)
                 if f != None:            
-                    if f[1] == 1:  # found a relation 
+                    if f[1] == 1:  # Found a relation 
                         rels_found += 1
                         filtered = filter_out_even_powers(f[0])
-                        rel = [filtered, y, Rad, A] 
-                        Rels.append(rel)
-                    elif merge and (f[1] in partials): # found a partial and try to merge
+                        rel = [filtered, y, Rad, A]
+                        if rel not in Rels:
+                            Rels.append(rel)
+                    elif merge and (f[1] in partials): # Found a partial, try to find a cycle
                         a = partials[f[1]]
                         p = filter_out_even_powers(f[0] + a[0])
-                        Ahs = A*a[3]
+                        Ahs = A * a[3]
                         lhs = Rad * a[2]
                         rhs = y * a[1]
                         LHS = Ahs + lhs
@@ -572,7 +573,7 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, logs_y
                         if N > g > 1:
                             cycleFactors.append([g , N // g])
                             sys.stderr.write("Found cycle with partial\n")
-                        else: # didnt merge so store the partial for later merging
+                        else: # Cycle not found, merge
                             if merge:
                                 rel = [p, rhs, lhs, Ahs]
                                 if rel not in Rels:
@@ -582,7 +583,7 @@ def relations_find(taskid, N, start, stop, P, min_log_primes, log_primes, logs_y
                                     merged_count.value += 1
                                     del partials[f[1]]
                     else:
-                        if merge:
+                        if merge: # Didnt merge, store the partial for later merging
                             partials[f[1]] = [f[0], y, Rad, A]
             else:
                 noproc += 1
