@@ -6,6 +6,56 @@ from gmpy2 import gcd, isqrt, is_prime, next_prime
 import itertools
 
 
+def prebuilt_params(bits):
+    """
+    Bounds estimation
+    borrowed from msieve/mpqs.c
+    """
+    if bits <= 64:
+        return [100, 40, 1 * 65536]
+    if bits <= 128: 
+        return [450, 40, 1 * 65536]
+    if bits <= 183:
+        return [2000, 40, 1 * 65536]
+    if bits <= 200: 
+        return [3000, 50, 1 * 65536]
+    if bits <= 212: 
+        return [5400, 50, 3 * 65536]
+    if bits <= 233:
+        return [10000, 100, 3 * 65536]
+    if bits <= 249:
+        return [27000, 100, 3 * 65536]
+    if bits <= 266:
+        return [50000, 100, 3 * 65536]
+    if bits <= 283:
+        return [55000, 80, 3 * 65536]
+    if bits <= 298:
+        return [60000, 80, 9 * 65536]
+    if bits <= 315:
+        return [80000, 150, 9 * 65536]
+    if bits <= 332:
+        return [100000, 150, 9 * 65536]
+    if bits <= 348:
+        return [140000, 150, 9 * 65536]
+    if bits <= 363:
+        return [210000, 150, 13 * 65536]
+    if bits <= 379:
+        return [300000, 150, 17 * 65536]
+    if bits <= 395:
+        return [400000, 150, 21 * 65536]
+    if bits <= 415:
+        return [500000, 150, 25 * 65536] # beyond this point you're crazy 
+    if bits <= 440:
+        return [700000, 150, 33 * 65536]
+    if bits <= 465:
+        return [900000, 150, 50 * 65536]
+    if bits <= 490:
+        return [1100000, 150, 75 * 65536]
+    if bits <= 512:
+        return [1300000, 150, 100 * 65536]
+    return [1300000, 150, 100 * 65536]
+
+
 def trial_division_minus_even_powers(n,P):
     a = []
     r = n
@@ -33,20 +83,18 @@ def trial_division_minus_even_powers(n,P):
     return [a,r,n]
 
 
-def minifactor(x,P):
-    if not is_prime(x):
-        i = isqrt(x)
-        if pow(i,2) != x: # perfect squares are even powers
-            p = trial_division_minus_even_powers(x,P)
-            if p[1] == 1: # if 1 x is B-smooth
-                return p
+def minifactor(x, P):
+    if not is_prime(x) and not is_square(x):
+        p = trial_division_minus_even_powers(x, P)
+        if p[1] == 1: # if 1 x is B-smooth
+            return p
 
 
 def QS(N,differences,y):
     i2N = isqrt(N)
-    X = [Integer(a^2 - N) for a in range(i2N + 1,i2N + differences)]
+    X = [int(a * a - N) for a in range(i2N + 1, i2N + differences)]
     P = list(primes(2, y))
-    F = list(filter(None,map(minifactor, X, itertools.repeat(P, len(X)))))
+    F = list(filter(None, map(minifactor, X, itertools.repeat(P, len(X)))))
 
     M = matrix(GF(2), len(F), len(P), lambda i, j:P[j] in F[i][0])
     for K in M.left_kernel().basis():
@@ -54,14 +102,14 @@ def QS(N,differences,y):
         x = product([int(isqrt(f[2] + N)) for f in I])
         y = isqrt(product([f[2] for f in I]))
         g0, g1 = gcd(N, x - y), gcd(N, x + y)
-        if N > g0 > 1:
-            return g0, N // g0
-        if N > g1 > 1:
-            return g1, N // g1
+        if N > g0 > 1 or N > g1 > 1:
+            return g0, g1
 
 
 if __name__ == "__main__":
-    r = QS(Integer(sys.argv[1]),int(sys.argv[2]),int(sys.argv[3]))
+    N = int(sys.argv[1])
+    y ,_ ,diff = prebuilt_params(N.bit_length())
+    r = QS(N, diff * 10, y * 10)
     if r != None:
         print("%d, %d" % r)
 
