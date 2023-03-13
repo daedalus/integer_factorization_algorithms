@@ -7,7 +7,7 @@ import itertools
 import sys
 
 
-def trial_division_minus_even_powers(n, P):
+def trial_division_odd_pows(n, P):
     a, r, pw = [], n, 0
     while (r & 1) == 0:
         pw += 1
@@ -23,7 +23,7 @@ def trial_division_minus_even_powers(n, P):
 
 
 def minifactor(x, P):
-    p = trial_division_minus_even_powers(x, P)
+    p = trial_division_odd_pows(x, P)
     if p[1] == 1: return p # if 1 then x is b-smooth
 
 
