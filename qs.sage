@@ -33,14 +33,14 @@ def eulercriterion(N, p):
 
 def QS(N, B1):
     sys.stderr.write("max prime: %d\n" % B1)
-    P = [p for p in list(primes(2, B1)) if eulercriterion(N, p) == 1]
+    P = [p for p in [*(primes(2, B1))] if eulercriterion(N, p) == 1]
     i2n, B2, X, offset, lp = isqrt(N), 65536, [], 0, len(P)
     while True:
         S = i2n + offset
         sys.stderr.write("Relations matix: [cols: %d x rows: %d]\n" % (lp, offset + B2))
         X += [int(a * a - N) for a in range(S + 1, S + B2)]
-        X = list(filter(lambda x:not is_power(x) and not is_prime(x), X))
-        F = list(filter(None, map(minifactor, X, itertools.repeat(P, len(X)))))
+        X = [*(filter(lambda x:not is_power(x) and not is_prime(x), X))]
+        F = [*(filter(None, map(minifactor, X, itertools.repeat(P, len(X)))))]
         M = matrix(GF(2), len(F), lp, lambda i, j:P[j] in F[i][0])
         sys.stderr.write("performing linear algebra:\n")
         for K in M.left_kernel().basis():
