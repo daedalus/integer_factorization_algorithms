@@ -44,8 +44,7 @@ def QS(N, B1):
         M = matrix(GF(2), len(F), lp, lambda i, j:P[j] in F[i][0])
         sys.stderr.write("performing linear algebra:\n")
         for K in M.left_kernel().basis():
-            I = [f for f, k in zip(F, K) if k == 1]
-            if len(I) > 0:
+            if I := [f for f, k in zip(F, K) if k == 1]:
                 sys.stderr.write("On Vector basis, taking square roots x and y.\n")
                 x = product([isqrt(f[2] + N) for f in I])
                 y = isqrt(product([f[2] for f in I]))
