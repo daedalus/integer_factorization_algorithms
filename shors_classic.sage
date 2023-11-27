@@ -22,24 +22,23 @@ def multiplicativeOrder(a,n):
    return -1
 
 def shor_factor(N,explain=False):
-  """ Shor's algorithm recreated in a classical computer
+   """ Shor's algorithm recreated in a classical computer
   Premise: given a ^ P - 1 % N  == 0, where a is random, and p = multOrd(a,N) we get a factor o N.
   Sage's implementation of multiplicative order first factors the integer (N) in question with PARI.
   In other words it can be said that the complexity of multiplicativeOrder problem 
   is equal to the complexity of the factorization problem.
   This makes this algorithm only a showcase for studying purposes and not an improvement of performance in any way."""
 
-  n = 1
-  p = q = None
-  while True:
-    a = random.randint(2,N-1)
-    b = gcd(a,N)
-    if explain:
-      print("Iter: %d" % n)
-      print("gcd(%d, %d) = %d" % (a,N,b))
-    if 1 < b < N:
-      return N//b,b
-    else:
+   n = 1
+   p = q = None
+   while True:
+      a = random.randint(2,N-1)
+      b = gcd(a,N)
+      if explain:
+        print("Iter: %d" % n)
+        print("gcd(%d, %d) = %d" % (a,N,b))
+      if 1 < b < N:
+         return N//b,b
       r = Mod(a,N).multiplicative_order() # Equivalent to quantum part of the algorithm, complexity: O(N).
       if explain:
         print("multOrd(%d, %d) = %d" % (a,N,r))
@@ -61,7 +60,7 @@ def shor_factor(N,explain=False):
           if p != None and q != None:
             assert p*q == N
             return p,q
-    n+=1
+      n+=1
 
 if __name__ == "__main__":
   """

@@ -23,14 +23,10 @@ class Fibonacci:
         """ fibonacci sequence nth item modulo p """
         if n == 0:
             return (0, 1)
-        else:
-            a, b = self._fib_res(n >> 1,p)
-            c = mod((mod(a, p) * mod(((b << 1) - a), p)), p)
-            d = mod((powmod(a, 2, p) + powmod(b, 2, p)), p)
-            if n & 1 == 0: 
-                return (c, d)
-            else:
-                return (d, mod((c + d), p))
+        a, b = self._fib_res(n >> 1,p)
+        c = mod((mod(a, p) * mod(((b << 1) - a), p)), p)
+        d = mod((powmod(a, 2, p) + powmod(b, 2, p)), p)
+        return (c, d) if n & 1 == 0 else (d, mod((c + d), p))
 
 
     def get_n_mod_d(self,n,d, use = 'mersenne'):
@@ -45,9 +41,7 @@ class Fibonacci:
 
     def ranged_period(self, N, start, stop, look_up_dest):
         print("ranged_period (%d,%d) start" % (start,stop))
-        tmp_look_up = {}
-        for x in range(start, stop):
-            tmp_look_up[self.get_n_mod_d(x, N)] = x
+        tmp_look_up = {self.get_n_mod_d(x, N): x for x in range(start, stop)}
         look_up_dest.update(tmp_look_up)
         #look_up_dest |= tmp_look_up
         print("ranged_period (%d,%d) end" % (start,stop))
@@ -56,24 +50,22 @@ class Fibonacci:
 
     def get_period_bigint(self, N, min_accept, xdiff, verbose = False):            
         search_len = int(pow(N, (1.0 / 6) / 100))
-        
-        if search_len < min_accept:
-            search_len = min_accept
-  
+
+        search_len = max(search_len, min_accept)
         if self.verbose:
             print('Search_len: %d, log2(N): %d' % (search_len,int(log2(N))))
-        
+
         starttime = time.time()
-        diff = xdiff 
+        diff = xdiff
         p_len = int((len(str(N)) + diff) >> 1) + 1
-        begin = N - int('9'*p_len) 
+        begin = N - int('9'*p_len)
         if begin <= 0:
             begin = 1
         end = N + int('9' * p_len)
-    
+
         if self.verbose:    
             print('Search begin: %d, end: %d'%(begin, end))
-        
+
         if self.multitasked and search_len > 1000:
             C = cpu_count() * 2
             search_work = search_len // C
@@ -84,10 +76,10 @@ class Fibonacci:
             if self.verbose:
                 print("Precompute LUT with %d tasks..." % C)
 
-            inputs = []
-            for x in range(0, search_len, search_work):
-                inputs += [(N, x, x + search_work, look_up)]
-
+            inputs = [
+                (N, x, x + search_work, look_up)
+                for x in range(0, search_len, search_work)
+            ]
             workpool = Pool(C)
 
             with workpool:
@@ -103,10 +95,10 @@ class Fibonacci:
         if self.verbose:
             print("LUT creation ended size: %d..." % len(look_up))
             print("Searching...")
-        
 
-        while True:       
-            randi = random.randint(begin,end)            
+
+        while True:   
+            randi = random.randint(begin,end)
             res = self.get_n_mod_d(randi, N)
             if res > 0:
                 #print(res, res in look_up)
@@ -122,13 +114,15 @@ class Fibonacci:
                         else:
                             if self.verbose:
                                 print('For N = %d\n Found res: %d, res_n: %d , T: %d\n but failed!' % (N, res, res_n, T))
-            else:
-                if randi & 1 == 0:
-                    T = randi
-                    td = int(time.time() - starttime)
-                    if self.verbose:
-                        print('First shot, For N = %d Found T:%d, randi: %d, time used %f secs.' % (N , T, randi, td))
-                    return td, T, randi
+            elif randi & 1 == 0:
+                td = int(time.time() - starttime)
+                T = randi
+                if self.verbose:
+                    print(
+                        'First shot, For N = %d Found T:%d, randi: %d, time used %f secs.'
+                        % (N, T, T, td)
+                    )
+                return td, T, T
 
   
     def _trivial_factorization_with_n_phi(self, N, T):
@@ -142,24 +136,16 @@ class Fibonacci:
 
         if phi2m4d > 0:
             iphi2m4d = isqrt(phi2m4d)
-            p1.append(phi + iphi2m4d)
-            p1.append(phi - iphi2m4d)
-
+            p1.extend((phi + iphi2m4d, phi - iphi2m4d))
         if phi2p4d > 0:
             iphi2p4d = isqrt(phi2p4d)
-            p1.append(phi + iphi2p4d)
-            p1.append(phi - iphi2p4d)
-
+            p1.extend((phi + iphi2p4d, phi - iphi2p4d))
         if phi2m4d > 0:
             iphi2m4d = isqrt(phi2m4d)
-            p1.append(-phi + iphi2m4d)
-            p1.append(-phi - iphi2m4d)
-
+            p1.extend((-phi + iphi2m4d, -phi - iphi2m4d))
         if phi2p4d > 0:
             iphi2p4d = isqrt(phi2p4d)
-            p1.append(-phi + iphi2p4d)
-            p1.append(-phi - iphi2p4d)
-
+            p1.extend((-phi + iphi2p4d, -phi - iphi2p4d))
         for p in p1:
             g = gcd((p >> 1),N)
             if N > g > 1:
@@ -224,7 +210,7 @@ def test(Ns,B2=0):
         if P != None:
             phi = (P[0]-1) * (P[1]-1)
             print("phi(N): %d" % phi)
-            print("factors: %s" % str(P))
+            print(f"factors: {str(P)}")
             ff += 1
         td = time.time() - ti
         ttd = time.time() - tti
@@ -235,27 +221,27 @@ def test(Ns,B2=0):
 
 
 def test2():
-  Fib = Fibonacci()
-  N = 384237701921
-  B1s = [10**x for x in range(6,3,-1)]
-  B2s = [0,2,4,6,8]
-  n=1
-  tti = time.time()
-  for B1 in B1s:
-      for B2 in B2s:
-          ti = time.time()
-          print("Test: %d, N: %d, log2(N): %d, B1: %d, B2: %d" % (n, N,int(log2(N)),B1,B2))
-          P = Fib.factorization(N,B1,B2)
-          if P != None:
-              phi = (P[0]-1) * (P[1]-1)
-              print("phi(N): %d" % phi)
-              print("factors: %s" % str(P))
-              ff += 1
-          td = time.time() - ti
-          ttd = time.time() - tti
-          print("Runtime: %f\nFully factored:%d of %d" % (td,ff,l))
-          print("Runtime total: %f" % (ttd))
-          n += 1
+    Fib = Fibonacci()
+    N = 384237701921
+    B1s = [10**x for x in range(6,3,-1)]
+    B2s = [0,2,4,6,8]
+    n=1
+    tti = time.time()
+    for B1 in B1s:
+        for B2 in B2s:
+            ti = time.time()
+            print("Test: %d, N: %d, log2(N): %d, B1: %d, B2: %d" % (n, N,int(log2(N)),B1,B2))
+            P = Fib.factorization(N,B1,B2)
+            if P != None:
+                phi = (P[0]-1) * (P[1]-1)
+                print("phi(N): %d" % phi)
+                print(f"factors: {str(P)}")
+                ff += 1
+            td = time.time() - ti
+            ttd = time.time() - tti
+            print("Runtime: %f\nFully factored:%d of %d" % (td,ff,l))
+            print("Runtime total: %f" % (ttd))
+            n += 1
 
 
 def test3(N, B2 = 0):
@@ -291,7 +277,7 @@ def test4(l,B2=0):
         if P != None:
             phi = (P[0]-1) * (P[1]-1)
             print("phi(N): %d" % phi)
-            print("factors: %s" % str(P))
+            print(f"factors: {str(P)}")
             ff += 1
         td = time.time() - ti
         ttd = time.time() - tti

@@ -69,8 +69,6 @@ def prebuilt_params(bits):
         return [900000, 150, 50 * 65536]
     if bits <= 490:
         return [1100000, 150, 75 * 65536]
-    if bits <= 512:
-        return [1300000, 150, 100 * 65536]
     return [1300000, 150, 100 * 65536]
 
 
@@ -113,10 +111,10 @@ def choose_multiplier(n, prime_list):
         if knmod8 == 5:
             scores[i] -= M_LN2;
             break;
-        if knmod8 == 3 or knmod8 == 7:
+        if knmod8 in [3, 7]:
             scores[i] -= 0.5 * M_LN2;
             break;
-        # even multipliers start with a handicap
+            # even multipliers start with a handicap
     num_multipliers = i;
 
     # for the rest of the small factor base primes 
@@ -131,7 +129,7 @@ def choose_multiplier(n, prime_list):
             knmodp = (curr_mult * modp) % prime
             # if prime i is actually in the factor base
             #   for k * n ... */
-            if (knmodp == 0 or legendre(knmodp, prime) == 1):
+            if knmodp == 0:
 
                 """ ...add its contribution. A prime p con-
                    tributes log(p) to 1 in p sieve values, plus
@@ -147,18 +145,31 @@ def choose_multiplier(n, prime_list):
                    the prime divides k*n. In that case there 
                    is only one root """
 
-                if (knmodp == 0):
-                    scores[j] -= contrib
-                else:
-                    scores[j] -= 2 * contrib
+                scores[j] -= contrib
+            elif legendre(knmodp, prime) == 1:
 
+                """ ...add its contribution. A prime p con-
+                   tributes log(p) to 1 in p sieve values, plus
+                   log(p) to 1 in p^2 sieve values, etc. The
+                   average contribution of all multiples of p 
+                   to a random sieve value is thus
+                   log(p) * (1/p + 1/p^2 + 1/p^3 + ...)
+                   = (log(p) / p) * 1 / (1 - (1/p)) 
+                   = log(p) / (p-1)
+                   This contribution occurs once for each
+                   square root used for sieving. There are two
+                   roots for each factor base prime, unless
+                   the prime divides k*n. In that case there 
+                   is only one root """
+
+                scores[j] -= contrib if (knmodp == 0) else 2 * contrib
     # use the multiplier that generates the best score 
 
     best_score = 1000.0
     best_mult = 1
 
     #print(scores)
-   
+
     for i in range(0, num_multipliers):
         score = scores[i];
         if (score < best_score):
@@ -212,15 +223,14 @@ def trial_division(n, P):
     l = len(P)
     i = 0
     for p in P:
-        if r >= p:
-            if r % p == 0:
-                pw = 0
-                while r % p == 0:
-                    pw += 1
-                    r //= p
-                a.append((int(p),int(pw)))
-        else:
+        if r < p:
             break
+        if r % p == 0:
+            pw = 0
+            while r % p == 0:
+                pw += 1
+                r //= p
+            a.append((int(p),int(pw)))
     return a,r,n
 
 
@@ -234,10 +244,7 @@ def merge_powers(ppws):
             d[p] = pw
         else:
             d[p] += pw
-    tmp2 = []
-    for p in d:
-       tmp2.append((p,d[p]))
-    return tmp2
+    return list(d.items())
 
 
 def filter_out_even_powers(ppws):
@@ -250,11 +257,7 @@ def filter_out_even_powers(ppws):
             d[p] = pw
         else:
             d[p] += pw
-    tmp2 = []
-    for p in d:
-        if d[p] & 1 != 0: # only keep odd powers
-            tmp2.append(p)
-    return tmp2
+    return [p for p, value in d.items() if value & 1 != 0]
 
 
 def trial_division_minus_even_powers(n, P):
@@ -297,13 +300,12 @@ def is_power_logprime(n, log_primes):
     Given the precomputed logs of a set of primes 
     we can test if a number n is a perfect power of that prime.
     """
-    ispow = False
     for p in log_primes:
         a = log(n) / p
         b = int(a)
         if a == b:
             iwpow = True
-    return ispow
+    return False
 
 
 def minifactor4(x, P, smooth_base):
@@ -337,7 +339,7 @@ class Poly:
         #self.counter = 0
         self.early_factors = []
 
-        if A == None and B == None and C == None:
+        if A is None and B is None and C is None:
             self.create()
         else:
             print("given poly parameters: %d %d %d" % (A,B,C))
@@ -401,15 +403,15 @@ class Poly:
         Code borrowed https://github.com/cramppet/quadratic-sieve/blob/master/QS.py
         """        
         A = self.A
-        B = self.B
         C = self.C
         n = self.n
         p = self.root_A
         if A > 1:
             g = 1
+            ainv = 1
+            B = self.B
             while g == 1:
                 p = next_prime(p)
-                ainv = 1
                 if A != 1:
                     g, inv, _ = gcdext(A, p)
                     if g != 1:
@@ -442,9 +444,8 @@ class Poly:
         """
         Return the string representation of the constructed polynomial
         """
-        m = "F(X) = %d X ^ 2 + %d X + %d with minima: %d" % (self.A, self.B, self.C, self.minima) 
-        m = m.replace("+ -","- ")
-        return m
+        m = "F(X) = %d X ^ 2 + %d X + %d with minima: %d" % (self.A, self.B, self.C, self.minima)
+        return m.replace("+ -","- ")
 
 
     def __add__(self, other):
@@ -486,9 +487,7 @@ class Poly:
         """
         Hashes unique values of the polynomial to construct an python internal id.
         """
-        h = hash("%d-%d-%d" % (self.A,self.B,self.C))
-        #print("hash: %s" % h)
-        return h
+        return hash("%d-%d-%d" % (self.A,self.B,self.C))
 
 
     def __eq__(self, other):
